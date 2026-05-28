@@ -6,23 +6,36 @@ import {
 } from '@angular/ssr/node';
 import express from 'express';
 import { join } from 'node:path';
+import { getAdminApp, getDb } from './server/firebase-admin';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
+app.use(express.json());
+
 /**
- * Example Express Rest API endpoints can be defined here.
- * Uncomment and define endpoints as necessary.
+ * Example Express REST API endpoint backed by the Admin (privileged) Firestore SDK.
+ * Add your server-side routes here; use `getDb()` to read/write Firestore.
  *
- * Example:
+ * Example with a real query:
  * ```ts
- * app.get('/api/{*splat}', (req, res) => {
- *   // Handle API request
+ * app.get('/api/users/:id', async (req, res, next) => {
+ *   try {
+ *     const snap = await getDb().collection('users').doc(req.params.id).get();
+ *     snap.exists ? res.json(snap.data()) : res.sendStatus(404);
+ *   } catch (err) {
+ *     next(err);
+ *   }
  * });
  * ```
  */
+app.get('/api/health', (_req, res) => {
+  // Touch the Admin Firestore handle to confirm wiring (no network call).
+  getDb();
+  res.json({ status: 'ok', projectId: getAdminApp().options.projectId ?? null });
+});
 
 /**
  * Serve static files from /browser

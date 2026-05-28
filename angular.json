@@ -32,7 +32,9 @@
             },
             "ssr": {
               "entry": "src/server.ts"
-            }
+            },
+            "externalDependencies": ["firebase-admin", "firebase-admin/*"],
+            "allowedCommonJsDependencies": ["@grpc/grpc-js", "@grpc/proto-loader"]
           },
           "configurations": {
             "production": {
@@ -53,7 +55,13 @@
             "development": {
               "optimization": false,
               "extractLicenses": false,
-              "sourceMap": true
+              "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.development.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"
