@@ -4,6 +4,7 @@ import { logger } from 'firebase-functions';
 import { defineSecret } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import type { ErrorDocument } from '@interfaces';
+import { runClaude } from '@shared';
 
 initializeApp();
 
@@ -30,11 +31,12 @@ export const onErrorCreated = onDocumentCreated(
     if (!snapshot) return;
 
     const error = errorConverter.fromFirestore(snapshot);
-    logger.info('error document created', {
-      errorId: event.params.errorId,
-      message: error.message,
+    const errorId = event.params.errorId;
+
+    const summary = await runClaude({
+      prompt: `Triage this error and suggest a likely cause and fix.\n\nMessage: ${error.message}\nStack: ${error.stack ?? '(none)'}`,
     });
 
-    // TODO: run the Claude Agent SDK against this error.
+    logger.info('error triaged', { errorId, summary });
   },
 );

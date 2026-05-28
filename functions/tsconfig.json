@@ -13,7 +13,9 @@
     "sourceMap": true,
     "paths": {
       "@interfaces": ["../interfaces/index.ts"],
-      "@interfaces/*": ["../interfaces/*"]
+      "@interfaces/*": ["../interfaces/*"],
+      "@shared": ["../shared/index.ts"],
+      "@shared/*": ["../shared/*"]
     }
   },
   "compileOnSave": true,
