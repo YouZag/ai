@@ -1,27 +1,40 @@
-/**
- * Firebase Cloud Functions (2nd gen) entry point.
- *
- * Uses the Admin SDK for privileged Firestore access. Credentials come from the
- * runtime service account when deployed; the Admin SDK connects to the local
- * emulator automatically when FIRESTORE_EMULATOR_HOST is set.
- */
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import type { FirestoreDataConverter, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
-import { onRequest } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import type { ErrorDocument } from './types.js';
 
 initializeApp();
-const db = getFirestore();
 
-/** HTTPS endpoint: writes a `pings` document and returns it. */
-export const ping = onRequest(async (_req, res) => {
-  const ref = await db.collection('pings').add({ createdAt: Date.now() });
-  const snap = await ref.get();
-  res.json({ id: ref.id, ...snap.data() });
-});
+const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
 
-/** Firestore trigger: fires when a `pings/{pingId}` document is created. */
-export const onPingCreated = onDocumentCreated('pings/{pingId}', (event) => {
-  logger.info('ping created', { pingId: event.params.pingId });
-});
+const errorConverter: FirestoreDataConverter<ErrorDocument> = {
+  toFirestore(error: ErrorDocument) {
+    return error;
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot) {
+    return snapshot.data() as ErrorDocument;
+  },
+};
+
+export const onErrorCreated = onDocumentCreated(
+  {
+    document: 'errors/{errorId}',
+    memory: '2GiB',
+    timeoutSeconds: 540,
+    secrets: [anthropicApiKey],
+  },
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) return;
+
+    const error = errorConverter.fromFirestore(snapshot);
+    logger.info('error document created', {
+      errorId: event.params.errorId,
+      message: error.message,
+    });
+
+    // TODO: run the Claude Agent SDK against this error.
+  },
+);
