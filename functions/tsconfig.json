@@ -10,7 +10,11 @@
     "noUnusedLocals": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "paths": {
+      "@interfaces": ["../interfaces/index.ts"],
+      "@interfaces/*": ["../interfaces/*"]
+    }
   },
   "compileOnSave": true,
   "include": ["src"]

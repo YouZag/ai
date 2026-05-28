@@ -3,7 +3,7 @@ import type { FirestoreDataConverter, QueryDocumentSnapshot } from 'firebase-adm
 import { logger } from 'firebase-functions';
 import { defineSecret } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
-import type { ErrorDocument } from './types.js';
+import type { ErrorDocument } from '@interfaces';
 
 initializeApp();
 
