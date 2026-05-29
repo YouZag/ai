@@ -4,11 +4,12 @@ import { logger } from 'firebase-functions';
 import { defineSecret } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import type { ErrorDocument } from '@interfaces';
-import { runClaude } from '@shared';
+import { runClaude, githubMcpServer } from '@shared';
 
 initializeApp();
 
 const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
+const githubToken = defineSecret('GITHUB_TOKEN');
 
 const errorConverter: FirestoreDataConverter<ErrorDocument> = {
   toFirestore(error: ErrorDocument) {
@@ -24,7 +25,7 @@ export const onErrorCreated = onDocumentCreated(
     document: 'errors/{errorId}',
     memory: '2GiB',
     timeoutSeconds: 540,
-    secrets: [anthropicApiKey],
+    secrets: [anthropicApiKey, githubToken],
   },
   async (event) => {
     const snapshot = event.data;
@@ -34,7 +35,8 @@ export const onErrorCreated = onDocumentCreated(
     const errorId = event.params.errorId;
 
     const summary = await runClaude({
-      prompt: `Triage this error and suggest a likely cause and fix.\n\nMessage: ${error.message}\nStack: ${error.stack ?? '(none)'}`,
+      prompt: `An application error was reported (id: ${errorId}). Investigate the likely cause and open a GitHub issue summarizing it with a suggested fix.\n\nMessage: ${error.message}\nStack: ${error.stack ?? '(none)'}`,
+      mcpServers: { github: githubMcpServer(githubToken.value()) },
     });
 
     logger.info('error triaged', { errorId, summary });

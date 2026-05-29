@@ -1,4 +1,4 @@
-import { query } from '@anthropic-ai/claude-agent-sdk';
+import { query, type McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 
 export interface RunClaudeOptions {
   prompt: string;
@@ -7,6 +7,7 @@ export interface RunClaudeOptions {
   systemPrompt?: string;
   maxTurns?: number;
   allowedTools?: string[];
+  mcpServers?: Record<string, McpServerConfig>;
 }
 
 export async function runClaude(options: RunClaudeOptions): Promise<string> {
@@ -18,6 +19,7 @@ export async function runClaude(options: RunClaudeOptions): Promise<string> {
       systemPrompt: options.systemPrompt,
       maxTurns: options.maxTurns,
       allowedTools: options.allowedTools,
+      mcpServers: options.mcpServers,
       permissionMode: 'bypassPermissions',
     },
   })) {
