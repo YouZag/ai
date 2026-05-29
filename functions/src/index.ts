@@ -4,7 +4,7 @@ import { logger } from 'firebase-functions';
 import { defineSecret } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { GoogleAuth } from 'google-auth-library';
-import type { ErrorDocument } from '@interfaces';
+import { ErrorDocumentSchema, type ErrorDocument } from '@schemas';
 import { runClaude, githubMcpServer, firestoreMcpServer } from '@shared';
 
 initializeApp();
@@ -19,7 +19,7 @@ const errorConverter: FirestoreDataConverter<ErrorDocument> = {
     return error;
   },
   fromFirestore(snapshot: QueryDocumentSnapshot) {
-    return snapshot.data() as ErrorDocument;
+    return ErrorDocumentSchema.parse(snapshot.data());
   },
 };
 

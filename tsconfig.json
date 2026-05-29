@@ -15,8 +15,8 @@
     "target": "ES2022",
     "module": "preserve",
     "paths": {
-      "@interfaces": ["./interfaces/index.ts"],
-      "@interfaces/*": ["./interfaces/*"],
+      "@schemas": ["./schemas/index.ts"],
+      "@schemas/*": ["./schemas/*"],
       "@shared": ["./shared/index.ts"],
       "@shared/*": ["./shared/*"]
     }
