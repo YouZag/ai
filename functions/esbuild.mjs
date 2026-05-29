@@ -15,6 +15,7 @@ const options = {
   packages: 'external',
   alias: {
     '@shared': resolve(root, '../shared/index.ts'),
+    '@shared/errors': resolve(root, '../shared/errors.ts'),
     '@schemas': resolve(root, '../schemas/index.ts'),
   },
 };

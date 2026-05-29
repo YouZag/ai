@@ -7,6 +7,8 @@ import {
 import express from 'express';
 import { join } from 'node:path';
 import { getAdminApp, getDb } from './server/firebase-admin';
+import { initServerErrorReporting } from './server/errors';
+import { reportError } from '@shared/errors';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
@@ -14,6 +16,8 @@ const app = express();
 const angularApp = new AngularNodeAppEngine();
 
 app.use(express.json());
+
+initServerErrorReporting();
 
 /**
  * Example Express REST API endpoint backed by the Admin (privileged) Firestore SDK.
@@ -57,6 +61,12 @@ app.use((req, res, next) => {
     .then((response) => (response ? writeResponseToNodeResponse(response, res) : next()))
     .catch(next);
 });
+
+const reportingErrorHandler: express.ErrorRequestHandler = (err, req, res, next) => {
+  void reportError(err, { path: req.originalUrl });
+  next(err);
+};
+app.use(reportingErrorHandler);
 
 /**
  * Start the server if this module is the main entry point, or it is ran via PM2.

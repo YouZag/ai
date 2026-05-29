@@ -1,11 +1,12 @@
 import { initializeApp } from 'firebase-admin/app';
-import type { FirestoreDataConverter, QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { getFirestore, type FirestoreDataConverter, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { defineSecret } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { GoogleAuth } from 'google-auth-library';
 import { ErrorDocumentSchema, type ErrorDocument } from '@schemas';
 import { runClaude, githubMcpServer, firestoreMcpServer } from '@shared';
+import { initErrorReporting } from '@shared/errors';
 
 initializeApp();
 
@@ -22,6 +23,11 @@ const errorConverter: FirestoreDataConverter<ErrorDocument> = {
     return ErrorDocumentSchema.parse(snapshot.data());
   },
 };
+
+initErrorReporting({
+  source: 'functions',
+  write: (doc) => getFirestore().collection('errors').withConverter(errorConverter).add(doc),
+});
 
 export const onErrorCreated = onDocumentCreated(
   {
