@@ -1,8 +1,9 @@
-import { initializeApp, applicationDefault } from 'firebase-admin/app';
+import { initializeApp } from 'firebase-admin/app';
 import type { FirestoreDataConverter, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { defineSecret } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { GoogleAuth } from 'google-auth-library';
 import type { ErrorDocument } from '@interfaces';
 import { runClaude, githubMcpServer, firestoreMcpServer } from '@shared';
 
@@ -10,6 +11,8 @@ initializeApp();
 
 const anthropicApiKey = defineSecret('ANTHROPIC_API_KEY');
 const githubToken = defineSecret('GITHUB_TOKEN');
+
+const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 
 const errorConverter: FirestoreDataConverter<ErrorDocument> = {
   toFirestore(error: ErrorDocument) {
@@ -34,10 +37,11 @@ export const onErrorCreated = onDocumentCreated(
     const error = errorConverter.fromFirestore(snapshot);
     const errorId = event.params.errorId;
 
-    const accessToken = (await applicationDefault().getAccessToken()).access_token;
+    const [accessToken, projectId] = await Promise.all([auth.getAccessToken(), auth.getProjectId()]);
+    if (!accessToken) throw new Error('Failed to obtain a Google access token');
 
     const summary = await runClaude({
-      prompt: `An application error was reported (id: ${errorId}). Investigate the likely cause, read any related data from Firestore that helps, and open a GitHub issue summarizing it with a suggested fix.\n\nMessage: ${error.message}\nStack: ${error.stack ?? '(none)'}`,
+      prompt: `An application error was reported (id: ${errorId}) in Firestore project "${projectId}", database "(default)". Investigate the likely cause, read any related Firestore data that helps, and open a GitHub issue summarizing it with a suggested fix.\n\nMessage: ${error.message}\nStack: ${error.stack ?? '(none)'}`,
       mcpServers: {
         github: githubMcpServer(githubToken.value()),
         firestore: firestoreMcpServer(accessToken),
