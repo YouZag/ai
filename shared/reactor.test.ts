@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { Step } from '@schemas';
-import { nextRoleFor, applyRunOutcome } from './reactor';
+import type { Run, Step } from '@schemas';
+import { nextRoleFor, applyRunOutcome, planRunCompletion } from './reactor';
 
 function step(overrides: Partial<Step> = {}): Step {
   return {
@@ -14,6 +14,18 @@ function step(overrides: Partial<Step> = {}): Step {
     status: 'building',
     attempts: 0,
     commitShas: [],
+    createdAt: 0,
+    ...overrides,
+  };
+}
+
+function run(overrides: Partial<Run> = {}): Run {
+  return {
+    role: 'builder',
+    target: { kind: 'step', id: 'step1' },
+    inputRefs: [],
+    status: 'running',
+    attemptNumber: 1,
     createdAt: 0,
     ...overrides,
   };
@@ -54,5 +66,49 @@ describe('applyRunOutcome', () => {
       status: 'blocked',
       attempts: 3,
     });
+  });
+});
+
+describe('planRunCompletion', () => {
+  it('completes a successful build and queues the test run on the same target', () => {
+    const result = planRunCompletion(
+      run({ target: { kind: 'step', id: 'step1' } }),
+      step({ status: 'building', attempts: 0 }),
+      'succeeded',
+      3,
+      1000,
+    );
+    expect(result.runStatus).toBe('succeeded');
+    expect(result.step).toEqual({ status: 'testing', attempts: 0 });
+    expect(result.nextRun).toEqual({
+      role: 'tester',
+      target: { kind: 'step', id: 'step1' },
+      inputRefs: [],
+      status: 'queued',
+      attemptNumber: 1,
+      createdAt: 1000,
+    });
+  });
+  it('loops a failed test back to a build run for the step assignee', () => {
+    const result = planRunCompletion(
+      run(),
+      step({ status: 'testing', attempts: 1, assignee: 'designer' }),
+      'failed',
+      3,
+      0,
+    );
+    expect(result.runStatus).toBe('failed');
+    expect(result.step).toEqual({ status: 'building', attempts: 2 });
+    expect(result.nextRun?.role).toBe('designer');
+  });
+  it('blocks at the attempt ceiling with no next run', () => {
+    const result = planRunCompletion(run(), step({ status: 'auditing', attempts: 2 }), 'failed', 3, 0);
+    expect(result.step).toEqual({ status: 'blocked', attempts: 3 });
+    expect(result.nextRun).toBeNull();
+  });
+  it('finishes a passing audit with no next run', () => {
+    const result = planRunCompletion(run(), step({ status: 'auditing', attempts: 0 }), 'succeeded', 3, 0);
+    expect(result.step).toEqual({ status: 'done', attempts: 0 });
+    expect(result.nextRun).toBeNull();
   });
 });
