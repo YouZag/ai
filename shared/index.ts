@@ -11,3 +11,4 @@ export * from './report.js';
 export * from './run-machine.js';
 export * from './step-machine.js';
 export * from './worker-core.js';
+export * from './workspace.js';

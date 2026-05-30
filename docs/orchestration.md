@@ -62,6 +62,9 @@ TASKS_LOCATION=REGION
 TASKS_QUEUE=build-runs
 WORKER_URL=https://REGION-PROJECT.cloudfunctions.net/runWorker
 TASKS_INVOKER_SA=tasks-invoker@PROJECT.iam.gserviceaccount.com
+REPO_OWNER=youzag
+REPO_NAME=ai
+WORK_BRANCH=main
 ```
 
 `WORKER_URL` is the deterministic Gen2 URL for `runWorker`, so it can be set before
@@ -114,6 +117,16 @@ gcloud run services remove-iam-policy-binding runworker \
 
 The OIDC token Cloud Tasks attaches is then required. (Optional defense in depth:
 verify the token's audience/email inside the handler.)
+
+## Worker execution environment
+
+Code-execution runs (builder, designer, tester, auditor) need a working tree. The
+worker checks out `WORK_BRANCH` of `REPO_OWNER/REPO_NAME` into `/tmp/workspace`
+(reused across warm instances), runs `npm ci` only when the lockfile changes, and
+runs the agent with that working directory so it can edit, build, test, and
+commit/push through its Bash and git tools. The `GITHUB_TOKEN` secret therefore
+needs push access to the repo. The worker runs with 8GiB to fit `npm ci` and builds
+in `/tmp`; raise it (Gen2 supports up to 32GiB) if larger builds need more headroom.
 
 ## Security
 

@@ -11,6 +11,7 @@ import {
   runClaude,
   githubMcpServer,
   firestoreMcpServer,
+  angularMcpServer,
   zodConverter,
   executeRun,
   sweepExpiredRuns,
@@ -20,6 +21,8 @@ import {
   loadAgent,
   parseRunReport,
   REPORT_INSTRUCTIONS,
+  needsWorkspace,
+  prepareWorkspace,
   type RunAgent,
 } from '@shared';
 import { initErrorReporting, reportError } from '@shared/errors';
@@ -40,6 +43,9 @@ const tasksLocation = defineString('TASKS_LOCATION');
 const tasksQueue = defineString('TASKS_QUEUE');
 const workerUrl = defineString('WORKER_URL');
 const tasksInvoker = defineString('TASKS_INVOKER_SA');
+const repoOwner = defineString('REPO_OWNER');
+const repoName = defineString('REPO_NAME');
+const workBranch = defineString('WORK_BRANCH');
 
 initErrorReporting({
   source: 'functions',
@@ -108,7 +114,7 @@ function taskPrompt(run: Run): string {
 }
 
 export const runWorker = onRequest(
-  { memory: '2GiB', timeoutSeconds: 3600, concurrency: 1, secrets: [anthropicApiKey, githubToken] },
+  { memory: '8GiB', timeoutSeconds: 3600, concurrency: 1, secrets: [anthropicApiKey, githubToken] },
   async (req, res) => {
     try {
       const { runId } = RunTaskSchema.parse(req.body);
@@ -120,6 +126,28 @@ export const runWorker = onRequest(
         if (!definition) {
           return { outcome: 'failed', summary: `No active agent definition for role "${run.role}"` };
         }
+
+        let cwd: string | undefined;
+        if (needsWorkspace(run.role)) {
+          try {
+            cwd = await prepareWorkspace({
+              owner: repoOwner.value(),
+              repo: repoName.value(),
+              branch: workBranch.value(),
+              token: githubToken.value(),
+              dir: '/tmp/workspace',
+            });
+          } catch (workspaceErr) {
+            await reportError(workspaceErr, { fn: 'prepareWorkspace', runId });
+            return {
+              outcome: 'failed',
+              summary: `Workspace setup failed: ${workspaceErr instanceof Error ? workspaceErr.message : String(workspaceErr)}`,
+            };
+          }
+        }
+
+        const useAngular = run.role === 'builder' || run.role === 'designer';
+
         try {
           const result = await runClaude({
             prompt: taskPrompt(run),
@@ -127,9 +155,11 @@ export const runWorker = onRequest(
             allowedTools: definition.tools,
             model: definition.model,
             maxTurns: definition.maxTurns,
+            cwd,
             mcpServers: {
               github: githubMcpServer(githubToken.value()),
               firestore: firestoreMcpServer(accessToken),
+              ...(useAngular ? { angular: angularMcpServer() } : {}),
             },
           });
           return parseRunReport(result);
