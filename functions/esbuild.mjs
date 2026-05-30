@@ -16,6 +16,7 @@ const options = {
   alias: {
     '@shared': resolve(root, '../shared/index.ts'),
     '@shared/errors': resolve(root, '../shared/errors.ts'),
+    '@shared/tasks': resolve(root, '../shared/tasks.ts'),
     '@schemas': resolve(root, '../schemas/index.ts'),
   },
 };

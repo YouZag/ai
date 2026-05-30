@@ -1,12 +1,13 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
-import { defineSecret } from 'firebase-functions/params';
+import { defineSecret, defineString } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { GoogleAuth } from 'google-auth-library';
-import { ErrorDocumentSchema } from '@schemas';
+import { ErrorDocumentSchema, RunSchema } from '@schemas';
 import { runClaude, githubMcpServer, firestoreMcpServer } from '@shared';
-import { initErrorReporting } from '@shared/errors';
+import { initErrorReporting, reportError } from '@shared/errors';
+import { enqueueRunTask, createRunTaskClient } from '@shared/tasks';
 import { zodConverter } from './converter.js';
 
 initializeApp();
@@ -17,6 +18,13 @@ const githubToken = defineSecret('GITHUB_TOKEN');
 const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 
 const errorConverter = zodConverter(ErrorDocumentSchema);
+const runConverter = zodConverter(RunSchema);
+
+const runTasksClient = createRunTaskClient();
+const tasksLocation = defineString('TASKS_LOCATION');
+const tasksQueue = defineString('TASKS_QUEUE');
+const workerUrl = defineString('WORKER_URL');
+const tasksInvoker = defineString('TASKS_INVOKER_SA');
 
 initErrorReporting({
   source: 'functions',
@@ -51,3 +59,30 @@ export const onErrorCreated = onDocumentCreated(
     logger.info('error triaged', { errorId, summary });
   },
 );
+
+export const onRunCreated = onDocumentCreated('runs/{runId}', async (event) => {
+  try {
+    const snapshot = event.data;
+    if (!snapshot) return;
+
+    const run = runConverter.fromFirestore(snapshot);
+    if (run.status !== 'queued') return;
+
+    const projectId = await auth.getProjectId();
+    const name = await enqueueRunTask(
+      runTasksClient,
+      {
+        projectId,
+        location: tasksLocation.value(),
+        queue: tasksQueue.value(),
+        workerUrl: workerUrl.value(),
+        invokerServiceAccount: tasksInvoker.value(),
+      },
+      { runId: event.params.runId },
+    );
+
+    logger.info('run enqueued', { runId: event.params.runId, task: name });
+  } catch (err) {
+    await reportError(err, { fn: 'onRunCreated', runId: event.params.runId });
+  }
+});

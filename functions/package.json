@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.154",
+    "@google-cloud/tasks": "^6.2.2",
     "firebase-admin": "^13.10.0",
     "firebase-functions": "^7.2.5",
     "google-auth-library": "^10.6.2",
