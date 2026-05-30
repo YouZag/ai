@@ -40,11 +40,14 @@ export async function executeRun(
       tx.set(runRef, { ...claimed, status: outcome, finishedAt, summary });
       if (step) {
         const completion = planRunCompletion(claimed, step, outcome, maxAttempts, finishedAt);
-        tx.set(stepRef, {
+        const nextStep = {
           ...step,
           status: completion.step.status,
           attempts: completion.step.attempts,
-        });
+        };
+        if (outcome === 'succeeded') delete nextStep.lastFailure;
+        else nextStep.lastFailure = summary;
+        tx.set(stepRef, nextStep);
         if (completion.nextRun) {
           tx.set(db.collection('runs').doc().withConverter(runConverter), completion.nextRun);
         }

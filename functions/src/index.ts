@@ -136,11 +136,20 @@ export const runWorker = onTaskDispatched(
         }
       }
 
+      let priorFailure = '';
+      if (run.target?.kind === 'step') {
+        const stepSnap = await getFirestore().collection('steps').doc(run.target.id).get();
+        const last = stepSnap.get('lastFailure');
+        if (typeof last === 'string' && last) {
+          priorFailure = `\n\nA previous attempt at this step failed:\n${last}\nDiagnose that specific failure and fix it before finishing; do not repeat it.`;
+        }
+      }
+
       const useAngular = run.role === 'builder' || run.role === 'designer';
 
       try {
         const result = await runClaude({
-          prompt: taskPrompt(run),
+          prompt: taskPrompt(run) + priorFailure,
           systemPrompt: definition.instructions,
           allowedTools: definition.tools,
           model: definition.model,

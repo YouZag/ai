@@ -79,6 +79,7 @@ describe.skipIf(!EMULATOR)('executeRun against the emulator', () => {
     expect(run?.status).toBe('succeeded');
     expect(run?.summary).toBe('done');
     expect((await db.collection('steps').doc('s1').get()).data()?.status).toBe('testing');
+    expect((await db.collection('steps').doc('s1').get()).data()?.lastFailure).toBeUndefined();
 
     const queued = await queuedRuns();
     expect(queued.size).toBe(1);
@@ -115,6 +116,7 @@ describe.skipIf(!EMULATOR)('executeRun against the emulator', () => {
     await executeRun(db, 'r4', fails, 3);
 
     expect((await db.collection('steps').doc('s4').get()).data()?.status).toBe('blocked');
+    expect((await db.collection('steps').doc('s4').get()).data()?.lastFailure).toBe('boom');
     expect((await queuedRuns()).size).toBe(0);
   });
 });

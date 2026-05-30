@@ -115,4 +115,19 @@ describe('integrateWork', () => {
     expect(result.ok).toBe(false);
     expect(result.reason).toContain('conflict');
   });
+
+  it('surfaces the verification output when the build fails', async () => {
+    const { work } = await scaffold();
+    await commitFile(work, 'feature.txt', 'feature\n', 'add feature');
+
+    const result = await integrateWork({
+      dir: work,
+      branch: 'main',
+      message: 'm',
+      verify: [['sh', '-c', 'echo TYPEERROR_X >&2; exit 1']],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('TYPEERROR_X');
+  });
 });

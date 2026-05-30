@@ -42,6 +42,7 @@ export const StepSchema = z.object({
   instruction: z.string().optional(),
   links: z.array(z.string()).optional(),
   response: z.string().optional(),
+  lastFailure: z.string().optional(),
   createdAt: TimestampSchema,
 });
 

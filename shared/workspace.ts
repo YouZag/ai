@@ -118,7 +118,11 @@ export async function integrateWork(config: IntegrateConfig): Promise<IntegrateR
     for (const [cmd, ...args] of verify) {
       const checked = await capture(cmd, args, dir);
       if (checked.code !== 0) {
-        return { ok: false, reason: `verification failed after rebase: ${[cmd, ...args].join(' ')}` };
+        const detail = (checked.stderr || checked.stdout).trim().slice(-1500);
+        return {
+          ok: false,
+          reason: `verification failed after rebase: ${[cmd, ...args].join(' ')}\n${detail}`,
+        };
       }
     }
 
