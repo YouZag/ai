@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Run, Step } from '@schemas';
-import { nextRoleFor, applyRunOutcome, planRunCompletion } from './reactor';
+import { nextRoleFor, applyRunOutcome, planRunCompletion, planStepDispatch } from './reactor';
 
 function step(overrides: Partial<Step> = {}): Step {
   return {
@@ -110,5 +110,26 @@ describe('planRunCompletion', () => {
     const result = planRunCompletion(run(), step({ status: 'auditing', attempts: 0 }), 'succeeded', 3, 0);
     expect(result.step).toEqual({ status: 'done', attempts: 0 });
     expect(result.nextRun).toBeNull();
+  });
+});
+
+describe('planStepDispatch', () => {
+  it('does not dispatch a pending step whose deps are unmet', () => {
+    expect(planStepDispatch(step({ status: 'pending' }), false)).toBeNull();
+  });
+  it('does not dispatch a step that is not pending', () => {
+    expect(planStepDispatch(step({ status: 'building' }), true)).toBeNull();
+  });
+  it('sends a ready agent step to building with its role', () => {
+    expect(planStepDispatch(step({ status: 'pending', assignee: 'designer' }), true)).toEqual({
+      status: 'building',
+      role: 'designer',
+    });
+  });
+  it('sends a ready human step to awaiting-user with no role', () => {
+    expect(planStepDispatch(step({ status: 'pending', assignee: 'user' }), true)).toEqual({
+      status: 'awaiting-user',
+      role: null,
+    });
   });
 });

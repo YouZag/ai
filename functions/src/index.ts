@@ -14,6 +14,7 @@ import {
   zodConverter,
   executeRun,
   sweepExpiredRuns,
+  dispatchSteps,
   loadAgent,
   parseRunReport,
   REPORT_INSTRUCTIONS,
@@ -154,5 +155,14 @@ export const reapRuns = onSchedule('every 5 minutes', async () => {
     logger.info('reaped runs', { reaped });
   } catch (err) {
     await reportError(err, { fn: 'reapRuns' });
+  }
+});
+
+export const dispatchPendingSteps = onSchedule('every 1 minutes', async () => {
+  try {
+    const { dispatched } = await dispatchSteps(getFirestore(), Date.now());
+    logger.info('dispatched steps', { dispatched });
+  } catch (err) {
+    await reportError(err, { fn: 'dispatchPendingSteps' });
   }
 });

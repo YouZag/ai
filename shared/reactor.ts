@@ -1,5 +1,5 @@
 import type { AgentRole, Ref, Run, RunStatus, Step, StepStatus } from '@schemas';
-import { advanceStep, type PhaseOutcome } from './step-machine.js';
+import { advanceStep, startStep, type PhaseOutcome } from './step-machine.js';
 
 export function nextRoleFor(step: Step): AgentRole | null {
   switch (step.status) {
@@ -64,4 +64,16 @@ export function planRunCompletion(
     step: stepOutcome,
     nextRun,
   };
+}
+
+export interface StepDispatch {
+  status: Extract<StepStatus, 'building' | 'awaiting-user'>;
+  role: AgentRole | null;
+}
+
+export function planStepDispatch(step: Step, depsDone: boolean): StepDispatch | null {
+  if (step.status !== 'pending' || !depsDone) return null;
+  const status = startStep(step);
+  if (status === 'awaiting-user') return { status, role: null };
+  return { status, role: nextRoleFor({ ...step, status }) };
 }
