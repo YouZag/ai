@@ -1,5 +1,5 @@
 import type { Firestore } from 'firebase-admin/firestore';
-import type { Run } from '@schemas';
+import type { Run, RunReport } from '@schemas';
 import { RunSchema, StepSchema } from '@schemas';
 import { zodConverter } from './converter.js';
 import { leaseRun, reapRun, DEFAULT_MAX_ATTEMPTS } from './run-machine.js';
@@ -8,12 +8,7 @@ import { planRunCompletion } from './reactor.js';
 const runConverter = zodConverter(RunSchema);
 const stepConverter = zodConverter(StepSchema);
 
-export interface RunResult {
-  outcome: 'succeeded' | 'failed';
-  summary: string;
-}
-
-export type RunAgent = (run: Run) => Promise<RunResult>;
+export type RunAgent = (run: Run) => Promise<RunReport>;
 
 export async function executeRun(
   db: Firestore,

@@ -14,6 +14,9 @@ import {
   zodConverter,
   executeRun,
   sweepExpiredRuns,
+  loadAgent,
+  parseRunReport,
+  REPORT_INSTRUCTIONS,
   type RunAgent,
 } from '@shared';
 import { initErrorReporting, reportError } from '@shared/errors';
@@ -96,9 +99,9 @@ export const onRunCreated = onDocumentCreated('runs/{runId}', async (event) => {
   }
 });
 
-function workerPrompt(run: Run): string {
+function taskPrompt(run: Run): string {
   const target = run.target ? `${run.target.kind} ${run.target.id}` : 'the repository';
-  return `You are the ${run.role} agent. Your target is ${target}. Carry out your role for this target using the available tools, then summarize what you changed.`;
+  return `Your target is ${target}. Read its details and any related context from Firestore, carry out your role, and finish.\n\n${REPORT_INSTRUCTIONS}`;
 }
 
 export const runWorker = onRequest(
@@ -110,15 +113,23 @@ export const runWorker = onRequest(
       if (!accessToken) throw new Error('Failed to obtain a Google access token');
 
       const agent: RunAgent = async (run) => {
+        const definition = await loadAgent(getFirestore(), run.role);
+        if (!definition) {
+          return { outcome: 'failed', summary: `No active agent definition for role "${run.role}"` };
+        }
         try {
-          const summary = await runClaude({
-            prompt: workerPrompt(run),
+          const result = await runClaude({
+            prompt: taskPrompt(run),
+            systemPrompt: definition.instructions,
+            allowedTools: definition.tools,
+            model: definition.model,
+            maxTurns: definition.maxTurns,
             mcpServers: {
               github: githubMcpServer(githubToken.value()),
               firestore: firestoreMcpServer(accessToken),
             },
           });
-          return { outcome: 'succeeded', summary };
+          return parseRunReport(result);
         } catch (agentErr) {
           await reportError(agentErr, { fn: 'runWorker', runId });
           return {

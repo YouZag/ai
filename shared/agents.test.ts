@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { initializeApp, deleteApp, type App } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
-import { seedAgents, exportAgents, DEFAULT_AGENTS } from './agents';
+import { seedAgents, exportAgents, loadAgent, DEFAULT_AGENTS } from './agents';
 
 const EMULATOR = process.env.FIRESTORE_EMULATOR_HOST;
 const PROJECT = 'demo-ai';
@@ -55,5 +55,16 @@ describe.skipIf(!EMULATOR)('seedAgents and exportAgents against the emulator', (
 
     await clear();
     expect(await seedAgents(db, 3000, bundle)).toEqual({ created: COUNT });
+  });
+
+  it('loads a seeded definition by role', async () => {
+    await seedAgents(db, 1000);
+    const builder = await loadAgent(db, 'builder');
+    expect(builder?.role).toBe('builder');
+    expect(builder?.status).toBe('active');
+  });
+
+  it('returns null when a role has no definition', async () => {
+    expect(await loadAgent(db, 'optimizer')).toBeNull();
   });
 });

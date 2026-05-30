@@ -1,5 +1,5 @@
 import type { Firestore } from 'firebase-admin/firestore';
-import type { AgentDefinition } from '@schemas';
+import type { AgentDefinition, AgentRole } from '@schemas';
 import { AgentDefinitionSchema } from '@schemas';
 import { zodConverter } from './converter.js';
 
@@ -103,4 +103,9 @@ export async function exportAgents(db: Firestore): Promise<Record<string, AgentS
     };
   }
   return bundle;
+}
+
+export async function loadAgent(db: Firestore, role: AgentRole): Promise<AgentDefinition | null> {
+  const snap = await db.collection('agents').doc(role).withConverter(converter).get();
+  return snap.exists ? (snap.data() ?? null) : null;
 }
