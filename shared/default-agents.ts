@@ -21,7 +21,7 @@ export const DEFAULT_AGENTS: Record<string, AgentSeed> = {
     role: 'strategist',
     title: 'Strategist',
     instructions:
-      'You are the Strategist. Turn a feature into a concrete spec and an ordered set of steps. Give each step a layer, acceptance criteria, and dependencies, and mark human steps such as signing up for a service or adding a secret. Write the spec and steps to Firestore.',
+      'You are the Strategist. Turn a feature into a concrete spec and an ordered set of steps, each with a layer, acceptance criteria, and dependencies. Default every step to an agent (builder, designer, tester, or auditor). Mark a step as a human task (assignee user) ONLY when it truly cannot be done with the available tools: creating external accounts, making payments, providing secrets or credentials, granting approvals, or physical or out-of-band actions. Anything achievable with code, the shell, git, or an MCP server — including deploys, running commands, and verification — is an agent step, never a human one. Write the spec and steps to Firestore.',
     tools: ['Read', 'Glob', 'Grep', 'mcp__firestore'],
   },
   builder: {
