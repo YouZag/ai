@@ -2,6 +2,7 @@ export * from './activity.js';
 export * from './agent-definition.js';
 export * from './agent-role.js';
 export * from './architecture.js';
+export * from './control.js';
 export * from './directive.js';
 export * from './error.js';
 export * from './feature.js';

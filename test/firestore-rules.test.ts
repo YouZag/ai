@@ -90,6 +90,12 @@ describe.skipIf(!EMULATOR)('firestore.rules', () => {
     await assertSucceeds(getDoc(doc(db, 'runs/r1')));
   });
 
+  it('lets an admin drive the pipeline phase via the control doc', async () => {
+    const db = admin();
+    await assertSucceeds(setDoc(doc(db, 'control/pipeline'), { phase: 'building', updatedAt: 0 }));
+    await assertSucceeds(getDoc(doc(db, 'control/pipeline')));
+  });
+
   it('blocks outsiders and anonymous users everywhere', async () => {
     for (const db of [outsider(), anon()]) {
       await assertFails(getDoc(doc(db, 'features/f1')));

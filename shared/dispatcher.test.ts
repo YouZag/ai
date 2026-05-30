@@ -24,6 +24,7 @@ beforeEach(async () => {
   await fetch(`http://${EMULATOR}/emulator/v1/projects/${PROJECT}/databases/(default)/documents`, {
     method: 'DELETE',
   });
+  await db.collection('control').doc('pipeline').set({ phase: 'building', updatedAt: 0 });
 });
 
 function seedStep(id: string, overrides: Partial<Step> = {}): Promise<unknown> {
@@ -87,5 +88,12 @@ describe.skipIf(!EMULATOR)('dispatchSteps against the emulator', () => {
     await dispatchSteps(db, 1000);
     expect(await dispatchSteps(db, 2000)).toEqual({ dispatched: 0 });
     expect((await queuedRuns()).size).toBe(1);
+  });
+
+  it('dispatches nothing while the pipeline is in planning', async () => {
+    await db.collection('control').doc('pipeline').set({ phase: 'planning', updatedAt: 0 });
+    await seedStep('s6', { assignee: 'builder' });
+    expect(await dispatchSteps(db, 1000)).toEqual({ dispatched: 0 });
+    expect((await db.collection('steps').doc('s6').get()).data()?.status).toBe('pending');
   });
 });

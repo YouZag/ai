@@ -15,6 +15,9 @@ async function depsAreDone(db: Firestore, step: Step): Promise<boolean> {
 }
 
 export async function dispatchSteps(db: Firestore, now: number): Promise<{ dispatched: number }> {
+  const control = await db.collection('control').doc('pipeline').get();
+  if (control.get('phase') !== 'building') return { dispatched: 0 };
+
   const stepsCol = db.collection('steps').withConverter(stepConverter);
   const pending = await stepsCol.where('status', '==', 'pending').get();
 

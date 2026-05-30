@@ -24,6 +24,9 @@ service cloud.firestore {
     match /directives/{doc} {
       allow read, write: if isAdmin();
     }
+    match /control/{doc} {
+      allow read, write: if isAdmin();
+    }
 
     match /specs/{doc} {
       allow read: if isAdmin();

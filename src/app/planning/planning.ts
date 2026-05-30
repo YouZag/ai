@@ -3,6 +3,7 @@ import { isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import type { Vision } from '@schemas';
 import { AuthService } from '../core/auth/auth.service';
+import { ControlService } from '../core/data/control.service';
 import { FeatureService } from '../core/data/feature.service';
 import { VisionService } from '../core/data/vision.service';
 
@@ -71,6 +72,23 @@ interface ChatMessage {
       <section
         class="min-h-0 space-y-4 overflow-y-auto rounded-md border border-gray-200 p-4"
       >
+        <div class="flex items-center justify-between border-b border-gray-200 pb-3">
+          <span class="text-sm font-semibold">Plan · {{ control.phase() }}</span>
+          @if (control.phase() === 'planning') {
+            <button
+              type="button"
+              (click)="startBuild()"
+              [disabled]="!features().length || starting()"
+              class="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+            >
+              {{ starting() ? 'Starting…' : 'Start build' }}
+            </button>
+          } @else {
+            <span class="rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
+              >building</span
+            >
+          }
+        </div>
         <div>
           <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Vision</h3>
           @if (vision(); as v) {
@@ -125,11 +143,13 @@ export class PlanningComponent {
   private readonly auth = inject(AuthService);
   private readonly visionService = inject(VisionService);
   protected readonly featureService = inject(FeatureService);
+  protected readonly control = inject(ControlService);
   private readonly platformId = inject(PLATFORM_ID);
 
   protected readonly messages = signal<ChatMessage[]>([]);
   protected readonly draft = signal('');
   protected readonly sending = signal(false);
+  protected readonly starting = signal(false);
   protected readonly error = signal('');
   protected readonly vision = signal<Vision | null>(null);
 
@@ -145,6 +165,24 @@ export class PlanningComponent {
 
   private async refreshVision(): Promise<void> {
     this.vision.set(await this.visionService.load());
+  }
+
+  async startBuild(): Promise<void> {
+    if (this.starting()) return;
+    this.starting.set(true);
+    try {
+      await this.control.setPhase('building');
+      const proposed = this.featureService.features
+        .data()
+        .filter((feature) => feature.status === 'proposed');
+      await Promise.all(
+        proposed.map((feature) => this.featureService.setStatus(feature.id, 'planned')),
+      );
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : String(err));
+    } finally {
+      this.starting.set(false);
+    }
   }
 
   async send(): Promise<void> {

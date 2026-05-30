@@ -211,6 +211,9 @@ export const onFeaturePlanned = onDocumentWritten('features/{featureId}', async 
     const after = event.data?.after?.data()?.status;
     if (!becamePlanned(before, after)) return;
 
+    const phase = (await getFirestore().collection('control').doc('pipeline').get()).get('phase');
+    if (phase !== 'building') return;
+
     const runId = await planFeature(getFirestore(), event.params.featureId, Date.now());
     logger.info('feature planning queued', { featureId: event.params.featureId, runId });
   } catch (err) {
