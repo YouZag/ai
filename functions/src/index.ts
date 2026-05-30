@@ -195,5 +195,3 @@ export const onFeaturePlanned = onDocumentWritten('features/{featureId}', async 
     await reportError(err, { fn: 'onFeaturePlanned', featureId: event.params.featureId });
   }
 });
-
-export { listModels } from './models';

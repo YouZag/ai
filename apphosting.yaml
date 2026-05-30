@@ -1,2 +1,8 @@
 runConfig:
   maxInstances: 1
+
+env:
+  - variable: ANTHROPIC_API_KEY
+    secret: ANTHROPIC_API_KEY
+    availability:
+      - RUNTIME

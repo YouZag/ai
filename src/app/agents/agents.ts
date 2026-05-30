@@ -1,15 +1,47 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { deleteField } from 'firebase/firestore';
 import { AgentService, type ModelOption } from '../core/data/agent.service';
+import type { AgentDefinition, AgentStatus } from '@schemas';
 import type { WithId } from '../core/firebase/firestore-rx';
-import type { AgentDefinition } from '@schemas';
 
 @Component({
   selector: 'app-agents',
   imports: [FormsModule],
   template: `
-    <h2 class="mb-4 text-lg font-semibold">Agents</h2>
+    <div class="mb-4 flex flex-wrap items-center gap-2">
+      <h2 class="mr-auto text-lg font-semibold">Agents</h2>
+      <button type="button" (click)="loadDefaults()" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">
+        Load defaults
+      </button>
+      <button type="button" (click)="exportBundle()" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">
+        Export
+      </button>
+      <button type="button" (click)="showImport.set(!showImport())" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">
+        Import
+      </button>
+    </div>
+
+    @if (showImport()) {
+      <div class="mb-4 grid max-w-3xl gap-2">
+        <textarea
+          rows="6"
+          placeholder="Paste an agent bundle (JSON)"
+          class="rounded-md border border-gray-300 p-2 font-mono text-sm"
+          [ngModel]="importText()"
+          (ngModelChange)="importText.set($event)"
+          name="importText"
+        ></textarea>
+        <div class="flex items-center gap-3">
+          <button type="button" (click)="runImport()" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">
+            Load bundle
+          </button>
+          @if (importError()) {
+            <span class="text-sm text-red-700">{{ importError() }}</span>
+          }
+        </div>
+      </div>
+    }
+
     @if (agents.loading()) {
       <p class="text-gray-500">Loading…</p>
     } @else if (agents.error()) {
@@ -18,111 +50,83 @@ import type { AgentDefinition } from '@schemas';
       <ul class="grid max-w-3xl gap-3">
         @for (agent of agents.data(); track agent.id) {
           <li class="rounded-md border border-gray-200 p-3">
-            @if (editingId() === agent.id) {
-              <form class="grid gap-3" (submit)="$event.preventDefault(); save(agent)">
-                <div class="flex items-center gap-3">
-                  <strong>{{ agent.title }}</strong>
-                  <span class="text-sm text-gray-500">{{ agent.role }}</span>
-                </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <strong>{{ agent.title }}</strong>
+              <span class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{{ agent.role }}</span>
+              <span
+                class="rounded px-2 py-0.5 text-xs"
+                [class]="agent.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'"
+                >{{ agent.status }}</span
+              >
+              <span class="flex-1"></span>
+              <button type="button" (click)="edit(agent)" class="rounded-md border border-gray-300 px-2 py-1 text-sm hover:bg-gray-50">
+                Edit
+              </button>
+            </div>
 
-                <label class="grid gap-1 text-sm">
-                  <span class="text-gray-600">Instructions</span>
-                  <textarea
-                    rows="5"
-                    name="instructions"
-                    [ngModel]="fInstructions()"
-                    (ngModelChange)="fInstructions.set($event)"
-                    class="rounded-md border border-gray-300 p-2 font-mono text-xs"
-                  ></textarea>
-                </label>
-
-                <label class="grid gap-1 text-sm">
-                  <span class="text-gray-600">Model</span>
-                  <select
-                    name="model"
-                    [ngModel]="fModel()"
-                    (ngModelChange)="fModel.set($event)"
-                    class="rounded-md border border-gray-300 p-2"
-                  >
-                    <option value="">Default (let the SDK choose)</option>
-                    @if (modelsLoading()) {
-                      <option disabled>Loading models…</option>
-                    }
-                    @for (model of models(); track model.id) {
-                      <option [value]="model.id">{{ model.displayName }}</option>
-                    }
-                    @if (fModel() && !modelIds().includes(fModel())) {
-                      <option [value]="fModel()">{{ fModel() }} (current)</option>
-                    }
-                  </select>
-                  @if (modelsError()) {
-                    <span class="text-red-700">Couldn't load the live list: {{ modelsError() }}</span>
+            @if (editing()?.id === agent.id) {
+              <div class="mt-3 grid gap-2">
+                <textarea
+                  rows="4"
+                  class="rounded-md border border-gray-300 p-2 text-sm"
+                  [ngModel]="instructions()"
+                  (ngModelChange)="instructions.set($event)"
+                  name="instructions"
+                ></textarea>
+                <input
+                  placeholder="Tools (comma-separated)"
+                  class="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  [ngModel]="tools()"
+                  (ngModelChange)="tools.set($event)"
+                  name="tools"
+                />
+                <select
+                  class="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  [ngModel]="model()"
+                  (ngModelChange)="model.set($event)"
+                  name="model"
+                >
+                  <option value="">Default (let the SDK choose)</option>
+                  @if (modelsLoading()) {
+                    <option disabled>Loading models…</option>
                   }
-                </label>
-
-                <div class="flex gap-3">
-                  <label class="grid flex-1 gap-1 text-sm">
-                    <span class="text-gray-600">Max turns</span>
-                    <input
-                      type="number"
-                      min="1"
-                      name="maxTurns"
-                      [ngModel]="fMaxTurns()"
-                      (ngModelChange)="fMaxTurns.set($event)"
-                      class="rounded-md border border-gray-300 p-2"
-                    />
-                  </label>
-                  <label class="grid flex-1 gap-1 text-sm">
-                    <span class="text-gray-600">Status</span>
-                    <select
-                      name="status"
-                      [ngModel]="fStatus()"
-                      (ngModelChange)="fStatus.set($event)"
-                      class="rounded-md border border-gray-300 p-2"
-                    >
-                      <option value="active">active</option>
-                      <option value="inactive">inactive</option>
-                    </select>
-                  </label>
-                </div>
-
+                  @for (m of models(); track m.id) {
+                    <option [value]="m.id">{{ m.displayName }}</option>
+                  }
+                  @if (model() && !modelIds().includes(model())) {
+                    <option [value]="model()">{{ model() }} (current)</option>
+                  }
+                </select>
+                @if (modelsError()) {
+                  <span class="text-sm text-red-700">Couldn't load the live list: {{ modelsError() }}</span>
+                }
+                <select
+                  class="w-40 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  [ngModel]="status()"
+                  (ngModelChange)="status.set($event)"
+                  name="status"
+                >
+                  <option value="active">active</option>
+                  <option value="retired">retired</option>
+                </select>
                 <div class="flex gap-2">
-                  <button
-                    type="submit"
-                    [disabled]="saving()"
-                    class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-                  >
-                    {{ saving() ? 'Saving…' : 'Save' }}
+                  <button type="button" (click)="save()" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">
+                    Save
                   </button>
-                  <button
-                    type="button"
-                    (click)="cancel()"
-                    class="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
-                  >
+                  <button type="button" (click)="editing.set(null)" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">
                     Cancel
                   </button>
+                  <button type="button" (click)="remove(agent.id)" class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50">
+                    Remove
+                  </button>
                 </div>
-              </form>
-            } @else {
-              <div class="flex items-center gap-3">
-                <strong>{{ agent.title }}</strong>
-                <span class="text-sm text-gray-500">{{ agent.role }}</span>
-                <span class="flex-1"></span>
-                <span class="text-xs text-gray-400">{{ agent.model ?? 'default model' }}</span>
-                <span class="text-xs text-gray-400">{{ agent.status }}</span>
-                <button
-                  type="button"
-                  (click)="startEdit(agent)"
-                  class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
-                >
-                  Edit
-                </button>
               </div>
-              <p class="mt-2 text-sm whitespace-pre-line text-gray-600">{{ agent.instructions }}</p>
+            } @else {
+              <p class="mt-2 text-sm text-gray-600">{{ agent.instructions }}</p>
             }
           </li>
         } @empty {
-          <li class="text-gray-500">No agents yet.</li>
+          <li class="text-gray-500">No agents. Load defaults to seed them.</li>
         }
       </ul>
     }
@@ -131,57 +135,33 @@ import type { AgentDefinition } from '@schemas';
 export class AgentsComponent {
   private readonly agentService = inject(AgentService);
 
-  protected readonly agents = this.agentService.all;
-
-  protected readonly editingId = signal<string | null>(null);
-  protected readonly fInstructions = signal('');
-  protected readonly fModel = signal('');
-  protected readonly fMaxTurns = signal<number | null>(null);
-  protected readonly fStatus = signal<'active' | 'inactive'>('active');
-  protected readonly saving = signal(false);
-
+  protected readonly agents = this.agentService.agents;
+  protected readonly editing = signal<WithId<AgentDefinition> | null>(null);
+  protected readonly instructions = signal('');
+  protected readonly tools = signal('');
+  protected readonly model = signal('');
+  protected readonly status = signal<AgentStatus>('active');
+  protected readonly showImport = signal(false);
+  protected readonly importText = signal('');
+  protected readonly importError = signal('');
   protected readonly models = signal<ModelOption[]>([]);
   protected readonly modelsLoading = signal(false);
-  protected readonly modelsError = signal<string | null>(null);
-  protected readonly modelIds = computed(() => this.models().map((model) => model.id));
+  protected readonly modelsError = signal('');
+  protected readonly modelIds = computed(() => this.models().map((m) => m.id));
 
-  startEdit(agent: WithId<AgentDefinition>): void {
-    this.editingId.set(agent.id);
-    this.fInstructions.set(agent.instructions);
-    this.fModel.set(agent.model ?? '');
-    this.fMaxTurns.set(agent.maxTurns ?? null);
-    this.fStatus.set(agent.status);
+  edit(agent: WithId<AgentDefinition>): void {
+    this.editing.set(agent);
+    this.instructions.set(agent.instructions);
+    this.tools.set(agent.tools.join(', '));
+    this.model.set(agent.model ?? '');
+    this.status.set(agent.status);
     void this.loadModels();
-  }
-
-  cancel(): void {
-    this.editingId.set(null);
-  }
-
-  async save(agent: WithId<AgentDefinition>): Promise<void> {
-    this.saving.set(true);
-    const maxTurns = this.fMaxTurns();
-    const model = this.fModel();
-    try {
-      await this.agentService.update(agent.id, {
-        instructions: this.fInstructions(),
-        status: this.fStatus(),
-        updatedAt: Date.now(),
-        model: model ? model : deleteField(),
-        maxTurns: typeof maxTurns === 'number' && maxTurns > 0 ? maxTurns : deleteField(),
-      });
-      this.editingId.set(null);
-    } catch (error) {
-      this.modelsError.set(error instanceof Error ? error.message : String(error));
-    } finally {
-      this.saving.set(false);
-    }
   }
 
   private async loadModels(): Promise<void> {
     if (this.models().length || this.modelsLoading()) return;
     this.modelsLoading.set(true);
-    this.modelsError.set(null);
+    this.modelsError.set('');
     try {
       this.models.set(await this.agentService.listModels());
     } catch (error) {
@@ -189,5 +169,66 @@ export class AgentsComponent {
     } finally {
       this.modelsLoading.set(false);
     }
+  }
+
+  save(): void {
+    const agent = this.editing();
+    if (!agent) return;
+    const model = this.model().trim();
+    const definition: AgentDefinition = {
+      role: agent.role,
+      title: agent.title,
+      instructions: this.instructions().trim(),
+      tools: this.tools()
+        .split(',')
+        .map((tool) => tool.trim())
+        .filter(Boolean),
+      ...(model ? { model } : {}),
+      ...(agent.maxTurns !== undefined ? { maxTurns: agent.maxTurns } : {}),
+      status: this.status(),
+      createdAt: agent.createdAt,
+      updatedAt: Date.now(),
+    };
+    void this.agentService.save(agent.id, definition);
+    this.editing.set(null);
+  }
+
+  remove(id: string): void {
+    void this.agentService.remove(id);
+    this.editing.set(null);
+  }
+
+  loadDefaults(): void {
+    void this.agentService.loadDefaults();
+  }
+
+  exportBundle(): void {
+    const blob = new Blob([JSON.stringify(this.agentService.toBundle(), null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'agents.json';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  runImport(): void {
+    this.importError.set('');
+    let bundle: Record<string, unknown>;
+    try {
+      bundle = JSON.parse(this.importText());
+    } catch {
+      this.importError.set('Invalid JSON');
+      return;
+    }
+    this.agentService
+      .importBundle(bundle)
+      .then(() => {
+        this.showImport.set(false);
+        this.importText.set('');
+      })
+      .catch((err: unknown) => this.importError.set(String(err)));
   }
 }

@@ -7,6 +7,7 @@ import {
 import express from 'express';
 import { join } from 'node:path';
 import { getAdminApp, getDb } from './server/firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
 import { initServerErrorReporting } from './server/errors';
 import { reportError } from '@shared/errors';
 
@@ -51,6 +52,53 @@ app.use(
     redirect: false,
   }),
 );
+
+const adminEmails = (process.env['ADMIN_EMAILS'] ?? 'drew@youzag.com')
+  .split(',')
+  .map((email) => email.trim())
+  .filter(Boolean);
+
+app.get('/api/models', (req, res, next) => {
+  void (async () => {
+    try {
+      const match = (req.header('authorization') ?? '').match(/^Bearer (.+)$/i);
+      if (!match) {
+        res.status(401).json({ error: 'Missing bearer token' });
+        return;
+      }
+      const decoded = await getAuth(getAdminApp()).verifyIdToken(match[1]);
+      if (
+        decoded.email_verified !== true ||
+        !decoded.email ||
+        !adminEmails.includes(decoded.email)
+      ) {
+        res.status(403).json({ error: 'Admins only' });
+        return;
+      }
+      const key = process.env['ANTHROPIC_API_KEY'];
+      if (!key) {
+        res.status(503).json({ error: 'Model list is not configured' });
+        return;
+      }
+      const anthropic = await fetch('https://api.anthropic.com/v1/models?limit=100', {
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      });
+      if (!anthropic.ok) {
+        res.status(502).json({ error: `Anthropic request failed (${anthropic.status})` });
+        return;
+      }
+      const body = (await anthropic.json()) as { data?: { id: string; display_name?: string }[] };
+      res.json({
+        models: (body.data ?? []).map((model) => ({
+          id: model.id,
+          displayName: model.display_name ?? model.id,
+        })),
+      });
+    } catch (err) {
+      next(err);
+    }
+  })();
+});
 
 /**
  * Handle all other requests by rendering the Angular application.

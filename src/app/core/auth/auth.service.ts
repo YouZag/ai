@@ -44,4 +44,8 @@ export class AuthService {
   signOut(): Promise<void> {
     return this.auth ? signOut(this.auth) : Promise.resolve();
   }
+
+  async idToken(): Promise<string | null> {
+    return this.auth?.currentUser ? this.auth.currentUser.getIdToken() : null;
+  }
 }
