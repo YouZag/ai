@@ -9,6 +9,7 @@ export * from './layer.js';
 export * from './metric-signal.js';
 export * from './ref.js';
 export * from './run.js';
+export * from './run-task.js';
 export * from './spec.js';
 export * from './step.js';
 export * from './timestamp.js';
