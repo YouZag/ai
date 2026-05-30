@@ -4,6 +4,7 @@ import { logger } from 'firebase-functions';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { GoogleAuth } from 'google-auth-library';
 import { ErrorDocumentSchema, RunSchema, RunTaskSchema, StepSchema, type Run } from '@schemas';
 import {
@@ -11,6 +12,7 @@ import {
   githubMcpServer,
   firestoreMcpServer,
   leaseRun,
+  reapRun,
   planRunCompletion,
   DEFAULT_MAX_ATTEMPTS,
 } from '@shared';
@@ -169,3 +171,47 @@ export const runWorker = onRequest(
     }
   },
 );
+
+export const reapRuns = onSchedule('every 5 minutes', async () => {
+  try {
+    const db = getFirestore();
+    const now = Date.now();
+    const runsCol = db.collection('runs').withConverter(runConverter);
+    const [leased, running] = await Promise.all([
+      runsCol.where('status', '==', 'leased').where('leasedUntil', '<=', now).get(),
+      runsCol.where('status', '==', 'running').where('leasedUntil', '<=', now).get(),
+    ]);
+
+    for (const snap of [...leased.docs, ...running.docs]) {
+      const run = snap.data();
+      const decision = reapRun(run, now, DEFAULT_MAX_ATTEMPTS);
+      if (!decision) continue;
+
+      const stepRef =
+        !decision.retryable && run.target?.kind === 'step'
+          ? db.collection('steps').doc(run.target.id).withConverter(stepConverter)
+          : null;
+
+      await db.runTransaction(async (tx) => {
+        const step = stepRef ? (await tx.get(stepRef)).data() : undefined;
+        tx.set(snap.ref, { ...run, status: 'abandoned', finishedAt: now });
+        if (decision.retryable && run.target) {
+          tx.set(db.collection('runs').doc().withConverter(runConverter), {
+            role: run.role,
+            target: run.target,
+            inputRefs: run.inputRefs,
+            status: 'queued',
+            attemptNumber: run.attemptNumber + 1,
+            createdAt: now,
+          });
+        } else if (stepRef && step) {
+          tx.set(stepRef, { ...step, status: 'blocked' });
+        }
+      });
+    }
+
+    logger.info('reaped runs', { leased: leased.size, running: running.size });
+  } catch (err) {
+    await reportError(err, { fn: 'reapRuns' });
+  }
+});
