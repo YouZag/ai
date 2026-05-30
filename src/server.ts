@@ -152,6 +152,7 @@ app.post('/api/plan', (req, res, next) => {
         content: m.content,
       }));
 
+      const parts: string[] = [];
       for (let turn = 0; turn < 8; turn++) {
         const resp = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -174,6 +175,12 @@ app.post('/api/plan', (req, res, next) => {
         }
         const data = (await resp.json()) as { content?: PlanBlock[]; stop_reason?: string };
         const content = data.content ?? [];
+        const narration = content
+          .filter((block) => block.type === 'text')
+          .map((block) => block.text ?? '')
+          .join('\n')
+          .trim();
+        if (narration) parts.push(narration);
 
         if (data.stop_reason === 'tool_use') {
           messages.push({ role: 'assistant', content });
@@ -188,12 +195,7 @@ app.post('/api/plan', (req, res, next) => {
           continue;
         }
 
-        const text = content
-          .filter((block) => block.type === 'text')
-          .map((block) => block.text ?? '')
-          .join('\n')
-          .trim();
-        res.json({ reply: text });
+        res.json({ reply: parts.join('\n\n') });
         return;
       }
       res.status(500).json({ error: 'Planning did not converge' });

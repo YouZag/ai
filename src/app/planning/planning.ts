@@ -1,7 +1,5 @@
-import { Component, PLATFORM_ID, computed, inject, signal } from '@angular/core';
-import { isPlatformBrowser } from '@angular/common';
+import { Component, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import type { Vision } from '@schemas';
 import { AuthService } from '../core/auth/auth.service';
 import { ControlService } from '../core/data/control.service';
 import { FeatureService } from '../core/data/feature.service';
@@ -24,7 +22,7 @@ interface ChatMessage {
             Lead the charge — describe what you want, and it fills in the vision and features.
           </p>
         </div>
-        <div class="flex-1 space-y-3 overflow-y-auto p-4">
+        <div #scroller class="flex-1 space-y-3 overflow-y-auto p-4">
           @for (m of messages(); track $index) {
             <div [class]="m.role === 'user' ? 'text-right' : ''">
               <span
@@ -55,6 +53,8 @@ interface ChatMessage {
             name="draft"
             [ngModel]="draft()"
             (ngModelChange)="draft.set($event)"
+            (keydown.meta.enter)="send()"
+            (keydown.control.enter)="send()"
             [disabled]="sending()"
             placeholder="Describe what you want to build — even vaguely…"
             class="flex-1 rounded-md border border-gray-300 p-2 text-sm"
@@ -69,9 +69,7 @@ interface ChatMessage {
         </form>
       </section>
 
-      <section
-        class="min-h-0 space-y-4 overflow-y-auto rounded-md border border-gray-200 p-4"
-      >
+      <section class="min-h-0 space-y-4 overflow-y-auto rounded-md border border-gray-200 p-4">
         <div class="flex items-center justify-between border-b border-gray-200 pb-3">
           <span class="text-sm font-semibold">Plan · {{ control.phase() }}</span>
           @if (control.phase() === 'planning') {
@@ -91,7 +89,11 @@ interface ChatMessage {
         </div>
         <div>
           <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Vision</h3>
-          @if (vision(); as v) {
+          @if (visionService.current.loading()) {
+            <p class="mt-1 text-sm text-gray-400">Loading…</p>
+          } @else if (visionService.current.error(); as e) {
+            <p class="mt-1 text-sm text-red-700">Couldn't load the vision. {{ e }}</p>
+          } @else if (visionService.current.data(); as v) {
             <p class="mt-1 text-sm">{{ v.statement }}</p>
             @if (v.principles.length) {
               <ul class="mt-2 list-disc pl-5 text-sm text-gray-600">
@@ -141,17 +143,17 @@ interface ChatMessage {
 })
 export class PlanningComponent {
   private readonly auth = inject(AuthService);
-  private readonly visionService = inject(VisionService);
+  protected readonly visionService = inject(VisionService);
   protected readonly featureService = inject(FeatureService);
   protected readonly control = inject(ControlService);
-  private readonly platformId = inject(PLATFORM_ID);
+
+  private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
   protected readonly messages = signal<ChatMessage[]>([]);
   protected readonly draft = signal('');
   protected readonly sending = signal(false);
   protected readonly starting = signal(false);
   protected readonly error = signal('');
-  protected readonly vision = signal<Vision | null>(null);
 
   protected readonly features = computed(() =>
     [...this.featureService.features.data()].sort(
@@ -160,11 +162,11 @@ export class PlanningComponent {
   );
 
   constructor() {
-    if (isPlatformBrowser(this.platformId)) void this.refreshVision();
-  }
-
-  private async refreshVision(): Promise<void> {
-    this.vision.set(await this.visionService.load());
+    effect(() => {
+      this.messages();
+      const el = this.scroller()?.nativeElement;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
   }
 
   async startBuild(): Promise<void> {
@@ -206,8 +208,9 @@ export class PlanningComponent {
       }
       const body = (await response.json()) as { reply: string };
       this.messages.update((m) => [...m, { role: 'assistant', content: body.reply }]);
-      await this.refreshVision();
     } catch (err) {
+      this.messages.update((m) => m.slice(0, -1));
+      this.draft.set(text);
       this.error.set(err instanceof Error ? err.message : String(err));
     } finally {
       this.sending.set(false);
