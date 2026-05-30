@@ -6,3 +6,5 @@ env:
     secret: ANTHROPIC_API_KEY
     availability:
       - RUNTIME
+  - variable: PLACES_API_KEY
+    secret: PLACES_API_KEY
