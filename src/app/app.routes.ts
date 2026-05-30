@@ -15,6 +15,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pipeline/pipeline').then((m) => m.PipelineComponent),
   },
   {
+    path: 'tasks',
+    loadComponent: () => import('./tasks/tasks').then((m) => m.TasksComponent),
+  },
+  {
     path: 'agents',
     loadComponent: () => import('./agents/agents').then((m) => m.AgentsComponent),
   },

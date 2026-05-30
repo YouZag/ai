@@ -30,6 +30,11 @@ service cloud.firestore {
     }
     match /steps/{doc} {
       allow read: if isAdmin();
+      allow update: if isAdmin()
+        && resource.data.assignee == 'user'
+        && resource.data.status == 'awaiting-user'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['done', 'blocked'];
     }
     match /runs/{doc} {
       allow read: if isAdmin();

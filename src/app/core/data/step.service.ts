@@ -15,4 +15,8 @@ export class StepService {
   );
 
   readonly all = this.repo.list([orderBy('createdAt', 'desc')]);
+
+  complete(id: string): Promise<void> {
+    return this.repo.update(id, { status: 'done' });
+  }
 }

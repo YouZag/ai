@@ -6,7 +6,7 @@ import {
   assertFails,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { addDoc, collection, doc, getDoc, setDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 const EMULATOR = process.env.FIRESTORE_EMULATOR_HOST;
 
@@ -49,6 +49,26 @@ const agent = {
   updatedAt: 0,
 };
 
+const humanStep = {
+  specId: 's',
+  featureId: 'f',
+  title: 'Add the Stripe secret',
+  kind: 'task',
+  assignee: 'user',
+  dependsOn: [],
+  acceptance: [],
+  status: 'awaiting-user',
+  attempts: 0,
+  commitShas: [],
+  instruction: 'Create a key and add it to Secret Manager.',
+  createdAt: 0,
+};
+
+const agentStep = { ...humanStep, assignee: 'builder', kind: 'add', status: 'pending' };
+
+const seed = (path: string, data: Record<string, unknown>) =>
+  testEnv.withSecurityRulesDisabled((context) => setDoc(doc(context.firestore(), path), data));
+
 describe.skipIf(!EMULATOR)('firestore.rules', () => {
   it('lets an admin author direction and report errors, and read the pipeline', async () => {
     const db = admin();
@@ -82,5 +102,36 @@ describe.skipIf(!EMULATOR)('firestore.rules', () => {
     const db = admin();
     await assertFails(setDoc(doc(db, 'runs/r1'), { status: 'queued' }));
     await assertFails(setDoc(doc(db, 'steps/s1'), { status: 'pending' }));
+  });
+
+  it('lets an admin complete a human step by flipping only its status', async () => {
+    await seed('steps/human', humanStep);
+    const db = admin();
+    await assertSucceeds(updateDoc(doc(db, 'steps/human'), { status: 'done' }));
+  });
+
+  it('lets an admin block a human step', async () => {
+    await seed('steps/human', humanStep);
+    const db = admin();
+    await assertSucceeds(updateDoc(doc(db, 'steps/human'), { status: 'blocked' }));
+  });
+
+  it('forbids an admin from editing any other field of a human step', async () => {
+    await seed('steps/human', humanStep);
+    const db = admin();
+    await assertFails(updateDoc(doc(db, 'steps/human'), { status: 'done', title: 'hijacked' }));
+    await assertFails(updateDoc(doc(db, 'steps/human'), { instruction: 'changed' }));
+  });
+
+  it('forbids flipping a human step to a non-terminal status', async () => {
+    await seed('steps/human', humanStep);
+    const db = admin();
+    await assertFails(updateDoc(doc(db, 'steps/human'), { status: 'building' }));
+  });
+
+  it('forbids an admin from touching an agent step', async () => {
+    await seed('steps/agent', agentStep);
+    const db = admin();
+    await assertFails(updateDoc(doc(db, 'steps/agent'), { status: 'done' }));
   });
 });
