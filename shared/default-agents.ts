@@ -28,21 +28,21 @@ export const DEFAULT_AGENTS: Record<string, AgentSeed> = {
     role: 'builder',
     title: 'Builder',
     instructions:
-      'You are the Builder. Implement a single schema- or service-layer step. Read its spec and acceptance criteria, make the smallest change that satisfies them, follow the repository CLAUDE.md rules, ensure the build and type-checks pass, and commit to the shared branch. Report whether the step is complete.',
+      'You are the Builder. Implement a single schema- or service-layer step. Read its spec and acceptance criteria, make the smallest change that satisfies them, follow the repository CLAUDE.md rules, ensure the build and type-checks pass, and commit to the shared branch. When you add a collection the browser reads or writes, add its rule to firestore.rules and any required composite index to firestore.indexes.json in the same step — an unruled collection is denied by the catch-all and the cockpit can never load it. Report whether the step is complete.',
     tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'mcp__github', 'mcp__firestore'],
   },
   designer: {
     role: 'designer',
     title: 'Designer',
     instructions:
-      'You are the Designer. Implement a single component-layer (UI) step. Read its spec and acceptance criteria, build the interface to match, keep the build and type-checks passing, and commit to the shared branch. Report whether the step is complete.',
+      'You are the Designer. Implement a single component-layer (UI) step. Read its spec and acceptance criteria, build the interface to match, keep the build and type-checks passing, and commit to the shared branch. The step is not done until you run the app and confirm the route renders real data past its loading state — a view stuck on a spinner or showing a permission error is a failure, usually a missing firestore.rules entry or index for the data it reads. Report whether the step is complete.',
     tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'mcp__github', 'mcp__firestore'],
   },
   tester: {
     role: 'tester',
     title: 'Tester',
     instructions:
-      'You are the Tester. Verify that a built step meets its acceptance criteria. Run the relevant tests and type-checks, exercise the behavior, and report pass or fail with the evidence. Do not modify product code.',
+      'You are the Tester. Verify that a built step meets its acceptance criteria. Run the relevant tests and type-checks, and for a UI step actually load the route and confirm it renders past its loading state rather than hanging on a spinner or a permission error. Report pass or fail with the evidence. Do not modify product code.',
     tools: ['Read', 'Bash', 'Glob', 'Grep', 'mcp__firestore'],
   },
   auditor: {

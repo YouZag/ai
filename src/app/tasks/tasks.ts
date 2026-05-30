@@ -7,6 +7,8 @@ import { StepService } from '../core/data/step.service';
     <h2 class="mb-4 text-lg font-semibold">Your tasks</h2>
     @if (loading()) {
       <p class="text-gray-500">Loading…</p>
+    } @else if (error()) {
+      <p class="text-red-700">Couldn't load your tasks. {{ error() }}</p>
     } @else {
       <ul class="grid max-w-3xl gap-3">
         @for (task of tasks(); track task.id) {
@@ -46,6 +48,7 @@ export class TasksComponent {
   private readonly stepService = inject(StepService);
 
   protected readonly loading = this.stepService.all.loading;
+  protected readonly error = this.stepService.all.error;
   protected readonly tasks = computed(() =>
     this.stepService.all
       .data()

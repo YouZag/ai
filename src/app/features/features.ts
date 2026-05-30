@@ -42,6 +42,8 @@ import { AuthService } from '../core/auth/auth.service';
 
     @if (features.loading()) {
       <p class="text-gray-500">Loading…</p>
+    } @else if (features.error()) {
+      <p class="text-red-700">Couldn't load features. {{ features.error() }}</p>
     } @else {
       <ul class="grid max-w-3xl gap-3">
         @for (feature of features.data(); track feature.id) {

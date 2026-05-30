@@ -44,6 +44,8 @@ import type { WithId } from '../core/firebase/firestore-rx';
 
     @if (agents.loading()) {
       <p class="text-gray-500">Loading…</p>
+    } @else if (agents.error()) {
+      <p class="text-red-700">Couldn't load agents. {{ agents.error() }}</p>
     } @else {
       <ul class="grid max-w-3xl gap-3">
         @for (agent of agents.data(); track agent.id) {

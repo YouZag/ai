@@ -27,6 +27,8 @@ const STATUS_BADGE: Record<string, string> = {
         <h2 class="mb-3 text-lg font-semibold">Runs</h2>
         @if (runs.loading()) {
           <p class="text-gray-500">Loading…</p>
+        } @else if (runs.error()) {
+          <p class="text-red-700">Couldn't load runs. {{ runs.error() }}</p>
         } @else {
           <ul class="grid gap-2">
             @for (run of runs.data(); track run.id) {
@@ -53,6 +55,8 @@ const STATUS_BADGE: Record<string, string> = {
         <h2 class="mb-3 text-lg font-semibold">Steps</h2>
         @if (steps.loading()) {
           <p class="text-gray-500">Loading…</p>
+        } @else if (steps.error()) {
+          <p class="text-red-700">Couldn't load steps. {{ steps.error() }}</p>
         } @else {
           <ul class="grid gap-2">
             @for (step of steps.data(); track step.id) {
