@@ -56,7 +56,7 @@ interface ChatMessage {
             [ngModel]="draft()"
             (ngModelChange)="draft.set($event)"
             [disabled]="sending()"
-            placeholder="e.g. I own funday.io and want to bring people real-world joy…"
+            placeholder="Describe what you want to build — even vaguely…"
             class="flex-1 rounded-md border border-gray-300 p-2 text-sm"
           ></textarea>
           <button

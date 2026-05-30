@@ -34,29 +34,29 @@ async function onlyFeature() {
 describe.skipIf(!EMULATOR)('applyPlanTool', () => {
   it('writes the vision', async () => {
     await applyPlanTool(db, 'set_vision', {
-      statement: 'Turn open time into a real Funday',
-      principles: ['joy not screen time'],
-      nonGoals: ['no ad feeds'],
+      statement: 'A clear product vision',
+      principles: ['the first principle'],
+      nonGoals: ['the first non-goal'],
     });
     const vision = (await db.collection('vision').doc('current').get()).data();
-    expect(vision?.statement).toBe('Turn open time into a real Funday');
-    expect(vision?.principles).toEqual(['joy not screen time']);
-    expect(vision?.nonGoals).toEqual(['no ad feeds']);
+    expect(vision?.statement).toBe('A clear product vision');
+    expect(vision?.principles).toEqual(['the first principle']);
+    expect(vision?.nonGoals).toEqual(['the first non-goal']);
   });
 
   it('creates a feature as a proposed studio feature', async () => {
     await applyPlanTool(db, 'upsert_feature', {
-      title: 'Right Now Generator',
-      description: 'Generate a doable Funday from live constraints',
-      rationale: 'the wedge',
-      acceptance: ['grounded, doable Funday in under 60s'],
+      title: 'First Feature',
+      description: 'The first capability',
+      rationale: 'the core',
+      acceptance: ['works end to end'],
       order: 1,
     });
     const { data } = await onlyFeature();
-    expect(data.title).toBe('Right Now Generator');
+    expect(data.title).toBe('First Feature');
     expect(data.status).toBe('proposed');
     expect(data.createdBy).toBe('studio');
-    expect(data.rationale).toBe('the wedge');
+    expect(data.rationale).toBe('the core');
     expect(data.order).toBe(1);
   });
 
