@@ -26,7 +26,7 @@ export function applyRunOutcome(step: Step, outcome: PhaseOutcome, maxAttempts: 
 
 export interface NewRun {
   role: AgentRole;
-  target?: Ref;
+  target: Ref;
   inputRefs: Ref[];
   status: Extract<RunStatus, 'queued'>;
   attemptNumber: number;
@@ -48,16 +48,17 @@ export function planRunCompletion(
 ): RunCompletion {
   const stepOutcome = applyRunOutcome(step, outcome, maxAttempts);
   const role = nextRoleFor({ ...step, status: stepOutcome.status });
-  const nextRun: NewRun | null = role
-    ? {
-        role,
-        target: run.target,
-        inputRefs: [],
-        status: 'queued',
-        attemptNumber: 1,
-        createdAt: now,
-      }
-    : null;
+  const nextRun: NewRun | null =
+    role && run.target
+      ? {
+          role,
+          target: run.target,
+          inputRefs: [],
+          status: 'queued',
+          attemptNumber: 1,
+          createdAt: now,
+        }
+      : null;
   return {
     runStatus: outcome === 'succeeded' ? 'succeeded' : 'failed',
     step: stepOutcome,

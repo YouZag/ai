@@ -3,9 +3,17 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onRequest } from 'firebase-functions/v2/https';
 import { GoogleAuth } from 'google-auth-library';
-import { ErrorDocumentSchema, RunSchema } from '@schemas';
-import { runClaude, githubMcpServer, firestoreMcpServer } from '@shared';
+import { ErrorDocumentSchema, RunSchema, RunTaskSchema, StepSchema, type Run } from '@schemas';
+import {
+  runClaude,
+  githubMcpServer,
+  firestoreMcpServer,
+  leaseRun,
+  planRunCompletion,
+  DEFAULT_MAX_ATTEMPTS,
+} from '@shared';
 import { initErrorReporting, reportError } from '@shared/errors';
 import { enqueueRunTask, createRunTaskClient } from '@shared/tasks';
 import { zodConverter } from './converter.js';
@@ -19,6 +27,7 @@ const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-pl
 
 const errorConverter = zodConverter(ErrorDocumentSchema);
 const runConverter = zodConverter(RunSchema);
+const stepConverter = zodConverter(StepSchema);
 
 const runTasksClient = createRunTaskClient();
 const tasksLocation = defineString('TASKS_LOCATION');
@@ -86,3 +95,77 @@ export const onRunCreated = onDocumentCreated('runs/{runId}', async (event) => {
     await reportError(err, { fn: 'onRunCreated', runId: event.params.runId });
   }
 });
+
+function workerPrompt(run: Run): string {
+  const target = run.target ? `${run.target.kind} ${run.target.id}` : 'the repository';
+  return `You are the ${run.role} agent. Your target is ${target}. Carry out your role for this target using the available tools, then summarize what you changed.`;
+}
+
+export const runWorker = onRequest(
+  { memory: '2GiB', timeoutSeconds: 3600, concurrency: 1, secrets: [anthropicApiKey, githubToken] },
+  async (req, res) => {
+    try {
+      const { runId } = RunTaskSchema.parse(req.body);
+      const db = getFirestore();
+      const runRef = db.collection('runs').doc(runId).withConverter(runConverter);
+
+      const claimed = await db.runTransaction(async (tx) => {
+        const run = (await tx.get(runRef)).data();
+        if (!run || run.status !== 'queued') return null;
+        const leased = { ...run, ...leaseRun(run, Date.now()) };
+        tx.set(runRef, leased);
+        return leased;
+      });
+      if (!claimed) {
+        res.status(200).send('skipped');
+        return;
+      }
+
+      await runRef.set({ ...claimed, status: 'running', startedAt: Date.now() });
+
+      const accessToken = await auth.getAccessToken();
+      if (!accessToken) throw new Error('Failed to obtain a Google access token');
+
+      let outcome: 'succeeded' | 'failed';
+      let summary: string;
+      try {
+        summary = await runClaude({
+          prompt: workerPrompt(claimed),
+          mcpServers: {
+            github: githubMcpServer(githubToken.value()),
+            firestore: firestoreMcpServer(accessToken),
+          },
+        });
+        outcome = 'succeeded';
+      } catch (agentErr) {
+        outcome = 'failed';
+        summary = agentErr instanceof Error ? agentErr.message : String(agentErr);
+        await reportError(agentErr, { fn: 'runWorker', runId });
+      }
+
+      const finishedAt = Date.now();
+      const target = claimed.target;
+      if (target?.kind === 'step') {
+        const stepRef = db.collection('steps').doc(target.id).withConverter(stepConverter);
+        await db.runTransaction(async (tx) => {
+          const step = (await tx.get(stepRef)).data();
+          tx.set(runRef, { ...claimed, status: outcome, finishedAt, summary });
+          if (step) {
+            const completion = planRunCompletion(claimed, step, outcome, DEFAULT_MAX_ATTEMPTS, finishedAt);
+            tx.set(stepRef, { ...step, status: completion.step.status, attempts: completion.step.attempts });
+            if (completion.nextRun) {
+              tx.set(db.collection('runs').doc().withConverter(runConverter), completion.nextRun);
+            }
+          }
+        });
+      } else {
+        await runRef.set({ ...claimed, status: outcome, finishedAt, summary });
+      }
+
+      res.status(200).send('ok');
+    } catch (err) {
+      await reportError(err, { fn: 'runWorker' });
+      res.status(500).send('error');
+    }
+  },
+);
