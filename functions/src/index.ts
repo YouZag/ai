@@ -24,6 +24,7 @@ import {
   REPORT_INSTRUCTIONS,
   needsWorkspace,
   prepareWorkspace,
+  integrateWork,
   type RunAgent,
 } from '@shared';
 import { initErrorReporting, reportError } from '@shared/errors';
@@ -151,7 +152,18 @@ export const runWorker = onTaskDispatched(
             ...(useAngular ? { angular: angularMcpServer() } : {}),
           },
         });
-        return parseRunReport(result);
+        const report = parseRunReport(result);
+        if (report.outcome === 'succeeded' && cwd && (run.role === 'builder' || run.role === 'designer')) {
+          const integration = await integrateWork({
+            dir: cwd,
+            branch: workBranch.value(),
+            message: `${run.role}: ${run.target ? `${run.target.kind} ${run.target.id}` : 'work'}`,
+          });
+          if (!integration.ok) {
+            return { outcome: 'failed', summary: `Integration failed: ${integration.reason}` };
+          }
+        }
+        return report;
       } catch (agentErr) {
         await reportError(agentErr, { fn: 'runWorker', runId });
         return {

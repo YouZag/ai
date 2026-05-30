@@ -20,6 +20,7 @@ export async function runClaude(options: RunClaudeOptions): Promise<string> {
       maxTurns: options.maxTurns,
       allowedTools: options.allowedTools,
       mcpServers: options.mcpServers,
+      settingSources: ['project'],
       permissionMode: 'bypassPermissions',
     },
   })) {
