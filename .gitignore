@@ -42,6 +42,7 @@ __screenshots__/
 # Firebase
 *-debug.log
 .firebase/
+functions/.env
 
 # System files
 .DS_Store
