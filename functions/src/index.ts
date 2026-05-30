@@ -25,6 +25,7 @@ import {
   needsWorkspace,
   prepareWorkspace,
   integrateWork,
+  headSha,
   type RunAgent,
 } from '@shared';
 import { initErrorReporting, reportError } from '@shared/errors';
@@ -118,6 +119,7 @@ export const runWorker = onTaskDispatched(
       }
 
       let cwd: string | undefined;
+      let baseSha = '';
       if (needsWorkspace(run.role)) {
         try {
           cwd = await prepareWorkspace({
@@ -127,6 +129,7 @@ export const runWorker = onTaskDispatched(
             token: githubToken.value(),
             dir: '/tmp/workspace',
           });
+          baseSha = await headSha(cwd);
         } catch (workspaceErr) {
           await reportError(workspaceErr, { fn: 'prepareWorkspace', runId });
           return {
@@ -167,6 +170,7 @@ export const runWorker = onTaskDispatched(
           const integration = await integrateWork({
             dir: cwd,
             branch: workBranch.value(),
+            base: baseSha,
             message: `${run.role}: ${run.target ? `${run.target.kind} ${run.target.id}` : 'work'}`,
           });
           if (!integration.ok) {

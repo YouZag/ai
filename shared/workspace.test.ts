@@ -36,7 +36,12 @@ async function configure(dir: string): Promise<void> {
   await git(['config', 'commit.gpgsign', 'false'], dir);
 }
 
-async function commitFile(dir: string, file: string, content: string, message: string): Promise<void> {
+async function commitFile(
+  dir: string,
+  file: string,
+  content: string,
+  message: string,
+): Promise<void> {
   writeFileSync(join(dir, file), content);
   await git(['add', '-A'], dir);
   await git(['commit', '-m', message], dir);
@@ -45,7 +50,12 @@ async function commitFile(dir: string, file: string, content: string, message: s
 describe('integrateWork', () => {
   let root: string;
 
-  async function scaffold(): Promise<{ origin: string; work: string; other: string }> {
+  async function scaffold(): Promise<{
+    origin: string;
+    work: string;
+    other: string;
+    base: string;
+  }> {
     root = mkdtempSync(join(tmpdir(), 'integrate-'));
     const origin = join(root, 'origin.git');
     const seed = join(root, 'seed');
@@ -61,7 +71,8 @@ describe('integrateWork', () => {
     await configure(work);
     await git(['clone', origin, other], root);
     await configure(other);
-    return { origin, work, other };
+    const base = (await git(['rev-parse', 'HEAD'], work)).stdout.trim();
+    return { origin, work, other, base };
   }
 
   afterEach(() => {
@@ -70,11 +81,24 @@ describe('integrateWork', () => {
 
   const verify = [['true']];
 
-  it('lands a clean commit on the shared branch', async () => {
-    const { origin, work } = await scaffold();
+  it('lands a clean commit the agent did not push itself', async () => {
+    const { origin, work, base } = await scaffold();
     await commitFile(work, 'feature.txt', 'feature\n', 'add feature');
 
-    const result = await integrateWork({ dir: work, branch: 'main', message: 'm', verify });
+    const result = await integrateWork({ dir: work, branch: 'main', base, message: 'm', verify });
+
+    expect(result.ok).toBe(true);
+    const fresh = join(root, 'fresh');
+    await git(['clone', origin, fresh], root);
+    expect((await git(['cat-file', '-e', 'HEAD:feature.txt'], fresh)).code).toBe(0);
+  });
+
+  it('accepts work the agent already reconciled and pushed', async () => {
+    const { origin, work, base } = await scaffold();
+    await commitFile(work, 'feature.txt', 'feature\n', 'add feature');
+    await git(['push', 'origin', 'main'], work);
+
+    const result = await integrateWork({ dir: work, branch: 'main', base, message: 'm', verify });
 
     expect(result.ok).toBe(true);
     const fresh = join(root, 'fresh');
@@ -83,19 +107,19 @@ describe('integrateWork', () => {
   });
 
   it('fails when the agent produced no commit', async () => {
-    const { work } = await scaffold();
-    const result = await integrateWork({ dir: work, branch: 'main', message: 'm', verify });
+    const { work, base } = await scaffold();
+    const result = await integrateWork({ dir: work, branch: 'main', base, message: 'm', verify });
     expect(result.ok).toBe(false);
     expect(result.reason).toContain('no commit');
   });
 
   it('rebases onto a branch that moved underneath it, then lands', async () => {
-    const { origin, work, other } = await scaffold();
+    const { origin, work, other, base } = await scaffold();
     await commitFile(other, 'theirs.txt', 'theirs\n', 'their change');
     await git(['push', 'origin', 'main'], other);
 
     await commitFile(work, 'mine.txt', 'mine\n', 'my change');
-    const result = await integrateWork({ dir: work, branch: 'main', message: 'm', verify });
+    const result = await integrateWork({ dir: work, branch: 'main', base, message: 'm', verify });
 
     expect(result.ok).toBe(true);
     const fresh = join(root, 'fresh');
@@ -105,24 +129,25 @@ describe('integrateWork', () => {
   });
 
   it('fails safe on a real conflict instead of force-landing', async () => {
-    const { work, other } = await scaffold();
+    const { work, other, base } = await scaffold();
     await commitFile(other, 'base.txt', 'theirs\n', 'their edit');
     await git(['push', 'origin', 'main'], other);
 
     await commitFile(work, 'base.txt', 'mine\n', 'my edit');
-    const result = await integrateWork({ dir: work, branch: 'main', message: 'm', verify });
+    const result = await integrateWork({ dir: work, branch: 'main', base, message: 'm', verify });
 
     expect(result.ok).toBe(false);
     expect(result.reason).toContain('conflict');
   });
 
   it('surfaces the verification output when the build fails', async () => {
-    const { work } = await scaffold();
+    const { work, base } = await scaffold();
     await commitFile(work, 'feature.txt', 'feature\n', 'add feature');
 
     const result = await integrateWork({
       dir: work,
       branch: 'main',
+      base,
       message: 'm',
       verify: [['sh', '-c', 'echo TYPEERROR_X >&2; exit 1']],
     });

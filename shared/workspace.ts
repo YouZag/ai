@@ -75,6 +75,7 @@ function capture(
 export interface IntegrateConfig {
   dir: string;
   branch: string;
+  base: string;
   message: string;
   verify?: string[][];
   maxPushAttempts?: number;
@@ -87,12 +88,10 @@ export interface IntegrateResult {
 }
 
 export async function integrateWork(config: IntegrateConfig): Promise<IntegrateResult> {
-  const { dir, branch } = config;
+  const { dir, branch, base } = config;
   const verify = config.verify ?? [['npm', 'run', 'build']];
   const maxPushAttempts = config.maxPushAttempts ?? 5;
   const git = (...args: string[]) => capture('git', ['-C', dir, ...args], dir);
-
-  const base = (await git('rev-parse', `origin/${branch}`)).stdout.trim();
 
   if ((await git('status', '--porcelain')).stdout.trim()) {
     await git('add', '-A');
@@ -106,8 +105,16 @@ export async function integrateWork(config: IntegrateConfig): Promise<IntegrateR
     return { ok: false, reason: 'no commit was produced — nothing to integrate' };
   }
 
+  await git('fetch', 'origin', branch);
+
+  // The agent may have already reconciled and pushed its own work.
+  const head = (await git('rev-parse', 'HEAD')).stdout.trim();
+  if ((await git('merge-base', '--is-ancestor', head, `origin/${branch}`)).code === 0) {
+    return { ok: true, sha: head };
+  }
+
   for (let attempt = 0; attempt < maxPushAttempts; attempt++) {
-    await git('fetch', 'origin', branch);
+    if (attempt > 0) await git('fetch', 'origin', branch);
 
     const rebase = await git('rebase', `origin/${branch}`);
     if (rebase.code !== 0) {
@@ -139,4 +146,8 @@ export async function integrateWork(config: IntegrateConfig): Promise<IntegrateR
   }
 
   return { ok: false, reason: `could not land the push after ${maxPushAttempts} attempts` };
+}
+
+export async function headSha(dir: string): Promise<string> {
+  return (await capture('git', ['-C', dir, 'rev-parse', 'HEAD'], dir)).stdout.trim();
 }
