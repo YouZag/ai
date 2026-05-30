@@ -41,6 +41,7 @@ export const StepSchema = z.object({
   commitShas: z.array(z.string()),
   instruction: z.string().optional(),
   links: z.array(z.string()).optional(),
+  response: z.string().optional(),
   createdAt: TimestampSchema,
 });
 

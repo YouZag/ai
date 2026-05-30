@@ -116,6 +116,23 @@ describe.skipIf(!EMULATOR)('firestore.rules', () => {
     await assertSucceeds(updateDoc(doc(db, 'steps/human'), { status: 'blocked' }));
   });
 
+  it('lets an admin complete a human step with a response note', async () => {
+    await seed('steps/human', humanStep);
+    const db = admin();
+    await assertSucceeds(
+      updateDoc(doc(db, 'steps/human'), {
+        status: 'done',
+        response: 'Resend, from onboarding@resend.dev, key in RESEND_API_KEY',
+      }),
+    );
+  });
+
+  it('forbids a response-only update that does not resolve the step', async () => {
+    await seed('steps/human', humanStep);
+    const db = admin();
+    await assertFails(updateDoc(doc(db, 'steps/human'), { response: 'note without finishing' }));
+  });
+
   it('forbids an admin from editing any other field of a human step', async () => {
     await seed('steps/human', humanStep);
     const db = admin();

@@ -33,7 +33,7 @@ service cloud.firestore {
       allow update: if isAdmin()
         && resource.data.assignee == 'user'
         && resource.data.status == 'awaiting-user'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'response'])
         && request.resource.data.status in ['done', 'blocked'];
     }
     match /runs/{doc} {

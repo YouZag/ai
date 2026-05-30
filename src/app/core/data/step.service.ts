@@ -16,7 +16,16 @@ export class StepService {
 
   readonly all = this.repo.list([orderBy('createdAt', 'desc')]);
 
-  complete(id: string): Promise<void> {
-    return this.repo.update(id, { status: 'done' });
+  complete(id: string, response?: string): Promise<void> {
+    return this.resolve(id, 'done', response);
+  }
+
+  block(id: string, response?: string): Promise<void> {
+    return this.resolve(id, 'blocked', response);
+  }
+
+  private resolve(id: string, status: 'done' | 'blocked', response?: string): Promise<void> {
+    const note = response?.trim();
+    return this.repo.update(id, note ? { status, response: note } : { status });
   }
 }
