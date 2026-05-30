@@ -2,6 +2,10 @@
   @if (auth.isAdmin()) {
     <header class="cockpit-header">
       <strong>AI Cockpit</strong>
+      <nav>
+        <a routerLink="/vision" routerLinkActive="active">Vision</a>
+        <a routerLink="/features" routerLinkActive="active">Features</a>
+      </nav>
       <span class="spacer"></span>
       <span>{{ user.email }}</span>
       <button type="button" (click)="signOut()">Sign out</button>

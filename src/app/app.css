@@ -21,6 +21,21 @@
   border-bottom: 1px solid #e3e3e3;
 }
 
+.cockpit-header nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.cockpit-header nav a {
+  color: #555;
+  text-decoration: none;
+}
+
+.cockpit-header nav a.active {
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
 .cockpit-header .spacer {
   flex: 1;
 }
