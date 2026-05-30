@@ -15,7 +15,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['shared/**/*.test.ts'],
+    include: ['shared/**/*.test.ts', 'test/**/*.test.ts'],
     fileParallelism: false,
   },
 });
