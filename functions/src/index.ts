@@ -155,6 +155,7 @@ export const runWorker = onTaskDispatched(
           model: definition.model,
           maxTurns: definition.maxTurns,
           cwd,
+          verify: useAngular ? { commands: [['npm', 'run', 'build']], maxAttempts: 3 } : undefined,
           mcpServers: {
             github: githubMcpServer(githubToken.value()),
             firestore: firestoreMcpServer(accessToken),
