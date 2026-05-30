@@ -10,4 +10,8 @@ export const routes: Routes = [
     path: 'features',
     loadComponent: () => import('./features/features').then((m) => m.FeaturesComponent),
   },
+  {
+    path: 'pipeline',
+    loadComponent: () => import('./pipeline/pipeline').then((m) => m.PipelineComponent),
+  },
 ];
