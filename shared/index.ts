@@ -4,6 +4,7 @@ export * from './converter.js';
 export * from './dispatcher.js';
 export * from './firestore.js';
 export * from './github.js';
+export * from './planner.js';
 export * from './reactor.js';
 export * from './report.js';
 export * from './run-machine.js';

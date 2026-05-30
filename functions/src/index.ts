@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { defineSecret, defineString } from 'firebase-functions/params';
-import { onDocumentCreated } from 'firebase-functions/v2/firestore';
+import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { GoogleAuth } from 'google-auth-library';
@@ -15,6 +15,8 @@ import {
   executeRun,
   sweepExpiredRuns,
   dispatchSteps,
+  becamePlanned,
+  planFeature,
   loadAgent,
   parseRunReport,
   REPORT_INSTRUCTIONS,
@@ -164,5 +166,18 @@ export const dispatchPendingSteps = onSchedule('every 1 minutes', async () => {
     logger.info('dispatched steps', { dispatched });
   } catch (err) {
     await reportError(err, { fn: 'dispatchPendingSteps' });
+  }
+});
+
+export const onFeaturePlanned = onDocumentWritten('features/{featureId}', async (event) => {
+  try {
+    const before = event.data?.before?.data()?.status;
+    const after = event.data?.after?.data()?.status;
+    if (!becamePlanned(before, after)) return;
+
+    const runId = await planFeature(getFirestore(), event.params.featureId, Date.now());
+    logger.info('feature planning queued', { featureId: event.params.featureId, runId });
+  } catch (err) {
+    await reportError(err, { fn: 'onFeaturePlanned', featureId: event.params.featureId });
   }
 });
