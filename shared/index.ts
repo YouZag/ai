@@ -4,6 +4,7 @@ export * from './converter.js';
 export * from './firestore.js';
 export * from './github.js';
 export * from './reactor.js';
+export * from './report.js';
 export * from './run-machine.js';
 export * from './step-machine.js';
 export * from './worker-core.js';
