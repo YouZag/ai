@@ -6,59 +6,52 @@ import { VisionService } from '../core/data/vision.service';
   selector: 'app-vision',
   imports: [FormsModule],
   template: `
-    <h2>Vision</h2>
-    <label>
-      Statement
-      <textarea
-        rows="3"
-        [ngModel]="statement()"
-        (ngModelChange)="statement.set($event)"
-        name="statement"
-      ></textarea>
-    </label>
-    <label>
-      Principles (one per line)
-      <textarea
-        rows="5"
-        [ngModel]="principles()"
-        (ngModelChange)="principles.set($event)"
-        name="principles"
-      ></textarea>
-    </label>
-    <label>
-      Non-goals (one per line)
-      <textarea
-        rows="5"
-        [ngModel]="nonGoals()"
-        (ngModelChange)="nonGoals.set($event)"
-        name="nonGoals"
-      ></textarea>
-    </label>
-    <div>
-      <button type="button" (click)="save()" [disabled]="saving()">Save vision</button>
-      @if (saved()) {
-        <span class="saved">Saved.</span>
-      }
+    <h2 class="mb-4 text-lg font-semibold">Vision</h2>
+    <div class="grid max-w-2xl gap-4">
+      <label class="grid gap-1">
+        <span class="text-sm text-gray-600">Statement</span>
+        <textarea
+          rows="3"
+          class="rounded-md border border-gray-300 p-2"
+          [ngModel]="statement()"
+          (ngModelChange)="statement.set($event)"
+          name="statement"
+        ></textarea>
+      </label>
+      <label class="grid gap-1">
+        <span class="text-sm text-gray-600">Principles (one per line)</span>
+        <textarea
+          rows="5"
+          class="rounded-md border border-gray-300 p-2"
+          [ngModel]="principles()"
+          (ngModelChange)="principles.set($event)"
+          name="principles"
+        ></textarea>
+      </label>
+      <label class="grid gap-1">
+        <span class="text-sm text-gray-600">Non-goals (one per line)</span>
+        <textarea
+          rows="5"
+          class="rounded-md border border-gray-300 p-2"
+          [ngModel]="nonGoals()"
+          (ngModelChange)="nonGoals.set($event)"
+          name="nonGoals"
+        ></textarea>
+      </label>
+      <div class="flex items-center gap-3">
+        <button
+          type="button"
+          (click)="save()"
+          [disabled]="saving()"
+          class="rounded-md border border-gray-300 px-4 py-2 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Save vision
+        </button>
+        @if (saved()) {
+          <span class="text-sm text-green-700">Saved.</span>
+        }
+      </div>
     </div>
-  `,
-  styles: `
-    :host {
-      display: grid;
-      gap: 1rem;
-      max-width: 640px;
-    }
-    label {
-      display: grid;
-      gap: 0.25rem;
-    }
-    textarea {
-      font: inherit;
-      padding: 0.5rem;
-    }
-    .saved {
-      margin-left: 0.75rem;
-      color: #1a7f37;
-    }
   `,
 })
 export class VisionComponent {

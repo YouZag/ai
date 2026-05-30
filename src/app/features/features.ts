@@ -7,19 +7,21 @@ import { AuthService } from '../core/auth/auth.service';
   selector: 'app-features',
   imports: [FormsModule],
   template: `
-    <h2>Features</h2>
-    <form (submit)="create($event)">
+    <h2 class="mb-4 text-lg font-semibold">Features</h2>
+    <form (submit)="create($event)" class="mb-4 flex max-w-3xl flex-wrap gap-2">
       <input
         [ngModel]="title()"
         (ngModelChange)="title.set($event)"
         name="title"
         placeholder="Title"
+        class="grow rounded-md border border-gray-300 px-3 py-2"
       />
       <input
         [ngModel]="description()"
         (ngModelChange)="description.set($event)"
         name="description"
         placeholder="Description"
+        class="grow rounded-md border border-gray-300 px-3 py-2"
       />
       <input
         type="number"
@@ -27,74 +29,44 @@ import { AuthService } from '../core/auth/auth.service';
         (ngModelChange)="priority.set(+$event)"
         name="priority"
         placeholder="Priority"
+        class="w-24 rounded-md border border-gray-300 px-3 py-2"
       />
-      <button type="submit" [disabled]="!title().trim()">Add feature</button>
+      <button
+        type="submit"
+        [disabled]="!title().trim()"
+        class="rounded-md border border-gray-300 px-4 py-2 hover:bg-gray-50 disabled:opacity-50"
+      >
+        Add feature
+      </button>
     </form>
 
     @if (features.loading()) {
-      <p class="muted">Loading…</p>
+      <p class="text-gray-500">Loading…</p>
     } @else {
-      <ul>
+      <ul class="grid max-w-3xl gap-3">
         @for (feature of features.data(); track feature.id) {
-          <li>
-            <div class="row">
+          <li class="rounded-md border border-gray-200 p-3">
+            <div class="flex items-center gap-3">
               <strong>{{ feature.title }}</strong>
-              <span class="status">{{ feature.status }} · p{{ feature.priority }}</span>
+              <span class="text-sm text-gray-500">{{ feature.status }} · p{{ feature.priority }}</span>
               @if (feature.status === 'proposed') {
-                <button type="button" (click)="plan(feature.id)">Mark planned</button>
+                <button
+                  type="button"
+                  (click)="plan(feature.id)"
+                  class="rounded-md border border-gray-300 px-2 py-1 text-sm hover:bg-gray-50"
+                >
+                  Mark planned
+                </button>
               }
             </div>
             @if (feature.description) {
-              <p>{{ feature.description }}</p>
+              <p class="mt-2 text-sm text-gray-600">{{ feature.description }}</p>
             }
           </li>
         } @empty {
-          <li>No features yet.</li>
+          <li class="text-gray-500">No features yet.</li>
         }
       </ul>
-    }
-  `,
-  styles: `
-    :host {
-      display: grid;
-      gap: 1rem;
-      max-width: 720px;
-    }
-    form {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-    }
-    input {
-      font: inherit;
-      padding: 0.4rem;
-    }
-    .muted {
-      color: #777;
-    }
-    ul {
-      list-style: none;
-      padding: 0;
-      display: grid;
-      gap: 0.75rem;
-    }
-    li {
-      border: 1px solid #e3e3e3;
-      border-radius: 6px;
-      padding: 0.75rem;
-    }
-    .row {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .status {
-      color: #555;
-      font-size: 0.9rem;
-    }
-    li p {
-      margin: 0.5rem 0 0;
-      color: #555;
     }
   `,
 })

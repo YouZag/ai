@@ -1,29 +1,57 @@
 @if (auth.user(); as user) {
   @if (auth.isAdmin()) {
-    <header class="cockpit-header">
-      <strong>AI Cockpit</strong>
-      <nav>
-        <a routerLink="/vision" routerLinkActive="active">Vision</a>
-        <a routerLink="/features" routerLinkActive="active">Features</a>
+    <header class="flex items-center gap-4 border-b border-gray-200 px-5 py-3">
+      <strong class="font-semibold">AI Cockpit</strong>
+      <nav class="flex gap-4 text-sm">
+        <a
+          routerLink="/vision"
+          routerLinkActive="font-semibold text-gray-900"
+          class="text-gray-500 hover:text-gray-900"
+          >Vision</a
+        >
+        <a
+          routerLink="/features"
+          routerLinkActive="font-semibold text-gray-900"
+          class="text-gray-500 hover:text-gray-900"
+          >Features</a
+        >
       </nav>
-      <span class="spacer"></span>
-      <span>{{ user.email }}</span>
-      <button type="button" (click)="signOut()">Sign out</button>
+      <span class="flex-1"></span>
+      <span class="text-sm text-gray-500">{{ user.email }}</span>
+      <button
+        type="button"
+        (click)="signOut()"
+        class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+      >
+        Sign out
+      </button>
     </header>
-    <main>
+    <main class="p-6">
       <router-outlet />
     </main>
   } @else {
-    <section class="gate">
-      <h1>AI Cockpit</h1>
-      <p>{{ user.email }} is not an authorized admin.</p>
-      <button type="button" (click)="signOut()">Sign out</button>
+    <section class="grid min-h-dvh place-content-center justify-items-center gap-4 text-center">
+      <h1 class="text-2xl font-semibold">AI Cockpit</h1>
+      <p class="text-gray-600">{{ user.email }} is not an authorized admin.</p>
+      <button
+        type="button"
+        (click)="signOut()"
+        class="rounded-md border border-gray-300 px-4 py-2 hover:bg-gray-50"
+      >
+        Sign out
+      </button>
     </section>
   }
 } @else {
-  <section class="gate">
-    <h1>AI Cockpit</h1>
-    <p>Sign in to author the vision and steer the build.</p>
-    <button type="button" (click)="signIn()">Sign in with Google</button>
+  <section class="grid min-h-dvh place-content-center justify-items-center gap-4 text-center">
+    <h1 class="text-2xl font-semibold">AI Cockpit</h1>
+    <p class="text-gray-600">Sign in to author the vision and steer the build.</p>
+    <button
+      type="button"
+      (click)="signIn()"
+      class="rounded-md border border-gray-300 px-4 py-2 hover:bg-gray-50"
+    >
+      Sign in with Google
+    </button>
   </section>
 }
