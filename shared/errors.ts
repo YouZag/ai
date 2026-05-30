@@ -18,13 +18,11 @@ export function initErrorReporting(reporting: ErrorReportingConfig): void {
 export function toErrorDocument(err: unknown, context?: Record<string, unknown>): ErrorDocument {
   const error =
     err instanceof Error ? err : new Error(typeof err === 'string' ? err : JSON.stringify(err));
-  return ErrorDocumentSchema.parse({
-    message: error.message,
-    stack: error.stack,
-    source: config?.source,
-    context,
-    createdAt: Date.now(),
-  });
+  const doc: Record<string, unknown> = { message: error.message, createdAt: Date.now() };
+  if (error.stack !== undefined) doc['stack'] = error.stack;
+  if (config?.source !== undefined) doc['source'] = config.source;
+  if (context !== undefined) doc['context'] = context;
+  return ErrorDocumentSchema.parse(doc);
 }
 
 export async function reportError(err: unknown, context?: Record<string, unknown>): Promise<void> {

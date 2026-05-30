@@ -44,6 +44,10 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
+    match /errors/{doc} {
+      allow read, create: if isAdmin();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
