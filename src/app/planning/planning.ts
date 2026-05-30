@@ -72,19 +72,35 @@ interface ChatMessage {
       <section class="min-h-0 space-y-4 overflow-y-auto rounded-md border border-gray-200 p-4">
         <div class="flex items-center justify-between border-b border-gray-200 pb-3">
           <span class="text-sm font-semibold">Plan · {{ control.phase() }}</span>
-          @if (control.phase() === 'planning') {
-            <button
-              type="button"
-              (click)="startBuild()"
-              [disabled]="!features().length || starting()"
-              class="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
-            >
-              {{ starting() ? 'Starting…' : 'Start build' }}
-            </button>
-          } @else {
-            <span class="rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
-              >building</span
-            >
+          @switch (control.phase()) {
+            @case ('planning') {
+              <button
+                type="button"
+                (click)="startBuild()"
+                [disabled]="!features().length || starting()"
+                class="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+              >
+                {{ starting() ? 'Starting…' : 'Start build' }}
+              </button>
+            }
+            @case ('building') {
+              <button
+                type="button"
+                (click)="pause()"
+                class="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100"
+              >
+                Pause
+              </button>
+            }
+            @case ('paused') {
+              <button
+                type="button"
+                (click)="resume()"
+                class="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+              >
+                Resume
+              </button>
+            }
           }
         </div>
         <div>
@@ -167,6 +183,14 @@ export class PlanningComponent {
       const el = this.scroller()?.nativeElement;
       if (el) el.scrollTop = el.scrollHeight;
     });
+  }
+
+  pause(): void {
+    void this.control.setPhase('paused');
+  }
+
+  resume(): void {
+    void this.control.setPhase('building');
   }
 
   async startBuild(): Promise<void> {
