@@ -8,6 +8,9 @@ From this repo to a running instance. The architecture and per-piece detail live
 - A Firebase project on the **Blaze** plan (Gen2 functions + Cloud Tasks need billing).
 - `gcloud` and `firebase` CLIs, authenticated (`gcloud auth login`, `firebase login`).
 - A **GitHub token** with push access to the repo, and an **Anthropic API key**.
+- Point both CLIs at your project: `gcloud config set project PROJECT` and
+  `firebase use PROJECT` (step 2's script does this). The Firebase project comes from
+  `.firebaserc`, not from `functions/.env`.
 
 ## 1. Client config
 

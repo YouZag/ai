@@ -19,6 +19,7 @@ INVOKER_SA="${INVOKER_NAME}@${PROJECT}.iam.gserviceaccount.com"
 
 echo "Project: ${PROJECT}  Region: ${REGION}  Queue: ${QUEUE}"
 gcloud config set project "${PROJECT}" >/dev/null
+firebase use "${PROJECT}" >/dev/null 2>&1 || echo "    (set the Firebase project manually: firebase use ${PROJECT})"
 
 echo "==> Enabling APIs"
 gcloud services enable \
