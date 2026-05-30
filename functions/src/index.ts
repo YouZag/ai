@@ -6,19 +6,18 @@ import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { GoogleAuth } from 'google-auth-library';
-import { ErrorDocumentSchema, RunSchema, RunTaskSchema, StepSchema, type Run } from '@schemas';
+import { ErrorDocumentSchema, RunSchema, RunTaskSchema, type Run } from '@schemas';
 import {
   runClaude,
   githubMcpServer,
   firestoreMcpServer,
-  leaseRun,
-  reapRun,
-  planRunCompletion,
-  DEFAULT_MAX_ATTEMPTS,
+  zodConverter,
+  executeRun,
+  sweepExpiredRuns,
+  type RunAgent,
 } from '@shared';
 import { initErrorReporting, reportError } from '@shared/errors';
 import { enqueueRunTask, createRunTaskClient } from '@shared/tasks';
-import { zodConverter } from './converter.js';
 
 initializeApp();
 
@@ -29,7 +28,6 @@ const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-pl
 
 const errorConverter = zodConverter(ErrorDocumentSchema);
 const runConverter = zodConverter(RunSchema);
-const stepConverter = zodConverter(StepSchema);
 
 const runTasksClient = createRunTaskClient();
 const tasksLocation = defineString('TASKS_LOCATION');
@@ -108,62 +106,29 @@ export const runWorker = onRequest(
   async (req, res) => {
     try {
       const { runId } = RunTaskSchema.parse(req.body);
-      const db = getFirestore();
-      const runRef = db.collection('runs').doc(runId).withConverter(runConverter);
-
-      const claimed = await db.runTransaction(async (tx) => {
-        const run = (await tx.get(runRef)).data();
-        if (!run || run.status !== 'queued') return null;
-        const leased = { ...run, ...leaseRun(run, Date.now()) };
-        tx.set(runRef, leased);
-        return leased;
-      });
-      if (!claimed) {
-        res.status(200).send('skipped');
-        return;
-      }
-
-      await runRef.set({ ...claimed, status: 'running', startedAt: Date.now() });
-
       const accessToken = await auth.getAccessToken();
       if (!accessToken) throw new Error('Failed to obtain a Google access token');
 
-      let outcome: 'succeeded' | 'failed';
-      let summary: string;
-      try {
-        summary = await runClaude({
-          prompt: workerPrompt(claimed),
-          mcpServers: {
-            github: githubMcpServer(githubToken.value()),
-            firestore: firestoreMcpServer(accessToken),
-          },
-        });
-        outcome = 'succeeded';
-      } catch (agentErr) {
-        outcome = 'failed';
-        summary = agentErr instanceof Error ? agentErr.message : String(agentErr);
-        await reportError(agentErr, { fn: 'runWorker', runId });
-      }
+      const agent: RunAgent = async (run) => {
+        try {
+          const summary = await runClaude({
+            prompt: workerPrompt(run),
+            mcpServers: {
+              github: githubMcpServer(githubToken.value()),
+              firestore: firestoreMcpServer(accessToken),
+            },
+          });
+          return { outcome: 'succeeded', summary };
+        } catch (agentErr) {
+          await reportError(agentErr, { fn: 'runWorker', runId });
+          return {
+            outcome: 'failed',
+            summary: agentErr instanceof Error ? agentErr.message : String(agentErr),
+          };
+        }
+      };
 
-      const finishedAt = Date.now();
-      const target = claimed.target;
-      if (target?.kind === 'step') {
-        const stepRef = db.collection('steps').doc(target.id).withConverter(stepConverter);
-        await db.runTransaction(async (tx) => {
-          const step = (await tx.get(stepRef)).data();
-          tx.set(runRef, { ...claimed, status: outcome, finishedAt, summary });
-          if (step) {
-            const completion = planRunCompletion(claimed, step, outcome, DEFAULT_MAX_ATTEMPTS, finishedAt);
-            tx.set(stepRef, { ...step, status: completion.step.status, attempts: completion.step.attempts });
-            if (completion.nextRun) {
-              tx.set(db.collection('runs').doc().withConverter(runConverter), completion.nextRun);
-            }
-          }
-        });
-      } else {
-        await runRef.set({ ...claimed, status: outcome, finishedAt, summary });
-      }
-
+      await executeRun(getFirestore(), runId, agent);
       res.status(200).send('ok');
     } catch (err) {
       await reportError(err, { fn: 'runWorker' });
@@ -174,43 +139,8 @@ export const runWorker = onRequest(
 
 export const reapRuns = onSchedule('every 5 minutes', async () => {
   try {
-    const db = getFirestore();
-    const now = Date.now();
-    const runsCol = db.collection('runs').withConverter(runConverter);
-    const [leased, running] = await Promise.all([
-      runsCol.where('status', '==', 'leased').where('leasedUntil', '<=', now).get(),
-      runsCol.where('status', '==', 'running').where('leasedUntil', '<=', now).get(),
-    ]);
-
-    for (const snap of [...leased.docs, ...running.docs]) {
-      const run = snap.data();
-      const decision = reapRun(run, now, DEFAULT_MAX_ATTEMPTS);
-      if (!decision) continue;
-
-      const stepRef =
-        !decision.retryable && run.target?.kind === 'step'
-          ? db.collection('steps').doc(run.target.id).withConverter(stepConverter)
-          : null;
-
-      await db.runTransaction(async (tx) => {
-        const step = stepRef ? (await tx.get(stepRef)).data() : undefined;
-        tx.set(snap.ref, { ...run, status: 'abandoned', finishedAt: now });
-        if (decision.retryable && run.target) {
-          tx.set(db.collection('runs').doc().withConverter(runConverter), {
-            role: run.role,
-            target: run.target,
-            inputRefs: run.inputRefs,
-            status: 'queued',
-            attemptNumber: run.attemptNumber + 1,
-            createdAt: now,
-          });
-        } else if (stepRef && step) {
-          tx.set(stepRef, { ...step, status: 'blocked' });
-        }
-      });
-    }
-
-    logger.info('reaped runs', { leased: leased.size, running: running.size });
+    const { reaped } = await sweepExpiredRuns(getFirestore(), Date.now());
+    logger.info('reaped runs', { reaped });
   } catch (err) {
     await reportError(err, { fn: 'reapRuns' });
   }
