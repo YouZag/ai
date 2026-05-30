@@ -1,12 +1,13 @@
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore, type FirestoreDataConverter, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { defineSecret } from 'firebase-functions/params';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { GoogleAuth } from 'google-auth-library';
-import { ErrorDocumentSchema, type ErrorDocument } from '@schemas';
+import { ErrorDocumentSchema } from '@schemas';
 import { runClaude, githubMcpServer, firestoreMcpServer } from '@shared';
 import { initErrorReporting } from '@shared/errors';
+import { zodConverter } from './converter.js';
 
 initializeApp();
 
@@ -15,14 +16,7 @@ const githubToken = defineSecret('GITHUB_TOKEN');
 
 const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
 
-const errorConverter: FirestoreDataConverter<ErrorDocument> = {
-  toFirestore(error: ErrorDocument) {
-    return error;
-  },
-  fromFirestore(snapshot: QueryDocumentSnapshot) {
-    return ErrorDocumentSchema.parse(snapshot.data());
-  },
-};
+const errorConverter = zodConverter(ErrorDocumentSchema);
 
 initErrorReporting({
   source: 'functions',
