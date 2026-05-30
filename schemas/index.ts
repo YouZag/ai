@@ -1,4 +1,5 @@
 export * from './activity.js';
+export * from './agent-definition.js';
 export * from './agent-role.js';
 export * from './architecture.js';
 export * from './directive.js';
