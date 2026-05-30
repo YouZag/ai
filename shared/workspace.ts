@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const WORKSPACE_ROLES = new Set(['builder', 'designer', 'tester', 'auditor']);
+const WORKSPACE_ROLES = new Set(['builder', 'designer', 'tester', 'auditor', 'strategist']);
 
 export function needsWorkspace(role: string): boolean {
   return WORKSPACE_ROLES.has(role);
