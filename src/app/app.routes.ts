@@ -1,7 +1,11 @@
 import { Routes } from '@angular/router';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'vision', pathMatch: 'full' },
+  { path: '', redirectTo: 'planning', pathMatch: 'full' },
+  {
+    path: 'planning',
+    loadComponent: () => import('./planning/planning').then((m) => m.PlanningComponent),
+  },
   {
     path: 'vision',
     loadComponent: () => import('./vision/vision').then((m) => m.VisionComponent),
