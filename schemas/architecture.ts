@@ -1,5 +1,7 @@
 import { z } from 'zod';
+import { IdSchema } from './id.js';
 import { LayerSchema } from './layer.js';
+import { TimestampSchema } from './timestamp.js';
 
 export const ArchitectureNodeStatusSchema = z.enum(['active', 'superseded']);
 
@@ -9,15 +11,14 @@ export const ArchitectureNodeSchema = z.object({
   kind: LayerSchema,
   name: z.string(),
   path: z.string(),
-  dependsOn: z.array(z.string()),
+  dependsOn: z.array(IdSchema),
   provenance: z.object({
-    featureId: z.string().optional(),
-    specId: z.string().optional(),
-    runId: z.string().optional(),
+    runId: IdSchema,
+    featureId: IdSchema.optional(),
+    specId: IdSchema.optional(),
   }),
   status: ArchitectureNodeStatusSchema,
-  verifiedAt: z.number(),
-  derived: z.literal(true),
+  verifiedAt: TimestampSchema,
 });
 
 export type ArchitectureNode = z.infer<typeof ArchitectureNodeSchema>;

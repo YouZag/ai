@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { IdSchema } from './id.js';
+import { TimestampSchema } from './timestamp.js';
 
 export const FeatureStatusSchema = z.enum(['proposed', 'planned', 'building', 'live', 'archived']);
 
@@ -8,10 +10,10 @@ export const FeatureSchema = z.object({
   title: z.string(),
   description: z.string(),
   status: FeatureStatusSchema,
-  priority: z.number(),
+  priority: z.number().int().nonnegative(),
   createdBy: z.string(),
-  supersededBy: z.string().optional(),
-  createdAt: z.number(),
+  supersededBy: IdSchema.optional(),
+  createdAt: TimestampSchema,
 });
 
 export type Feature = z.infer<typeof FeatureSchema>;
