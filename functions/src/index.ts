@@ -1,10 +1,11 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getFunctions } from 'firebase-admin/functions';
 import { logger } from 'firebase-functions';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/v2/firestore';
-import { onRequest } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { onTaskDispatched } from 'firebase-functions/v2/tasks';
 import { GoogleAuth } from 'google-auth-library';
 import { ErrorDocumentSchema, RunSchema, RunTaskSchema, type Run } from '@schemas';
 import {
@@ -26,7 +27,6 @@ import {
   type RunAgent,
 } from '@shared';
 import { initErrorReporting, reportError } from '@shared/errors';
-import { enqueueRunTask, createRunTaskClient } from '@shared/tasks';
 
 initializeApp();
 
@@ -38,11 +38,6 @@ const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-pl
 const errorConverter = zodConverter(ErrorDocumentSchema);
 const runConverter = zodConverter(RunSchema);
 
-const runTasksClient = createRunTaskClient();
-const tasksLocation = defineString('TASKS_LOCATION');
-const tasksQueue = defineString('TASKS_QUEUE');
-const workerUrl = defineString('WORKER_URL');
-const tasksInvoker = defineString('TASKS_INVOKER_SA');
 const repoOwner = defineString('REPO_OWNER');
 const repoName = defineString('REPO_NAME');
 const workBranch = defineString('WORK_BRANCH');
@@ -89,20 +84,8 @@ export const onRunCreated = onDocumentCreated('runs/{runId}', async (event) => {
     const run = runConverter.fromFirestore(snapshot);
     if (run.status !== 'queued') return;
 
-    const projectId = await auth.getProjectId();
-    const name = await enqueueRunTask(
-      runTasksClient,
-      {
-        projectId,
-        location: tasksLocation.value(),
-        queue: tasksQueue.value(),
-        workerUrl: workerUrl.value(),
-        invokerServiceAccount: tasksInvoker.value(),
-      },
-      { runId: event.params.runId },
-    );
-
-    logger.info('run enqueued', { runId: event.params.runId, task: name });
+    await getFunctions().taskQueue('runWorker').enqueue({ runId: event.params.runId });
+    logger.info('run enqueued', { runId: event.params.runId });
   } catch (err) {
     await reportError(err, { fn: 'onRunCreated', runId: event.params.runId });
   }
@@ -113,71 +96,72 @@ function taskPrompt(run: Run): string {
   return `Your target is ${target}. Read its details and any related context from Firestore, carry out your role, and finish.\n\n${REPORT_INSTRUCTIONS}`;
 }
 
-export const runWorker = onRequest(
-  { memory: '8GiB', timeoutSeconds: 3600, concurrency: 1, secrets: [anthropicApiKey, githubToken] },
-  async (req, res) => {
-    try {
-      const { runId } = RunTaskSchema.parse(req.body);
-      const accessToken = await auth.getAccessToken();
-      if (!accessToken) throw new Error('Failed to obtain a Google access token');
+export const runWorker = onTaskDispatched(
+  {
+    memory: '8GiB',
+    timeoutSeconds: 1800,
+    concurrency: 1,
+    retryConfig: { maxAttempts: 3 },
+    rateLimits: { maxConcurrentDispatches: 1 },
+    secrets: [anthropicApiKey, githubToken],
+  },
+  async (req) => {
+    const { runId } = RunTaskSchema.parse(req.data);
+    const accessToken = await auth.getAccessToken();
+    if (!accessToken) throw new Error('Failed to obtain a Google access token');
 
-      const agent: RunAgent = async (run) => {
-        const definition = await loadAgent(getFirestore(), run.role);
-        if (!definition) {
-          return { outcome: 'failed', summary: `No active agent definition for role "${run.role}"` };
-        }
+    const agent: RunAgent = async (run) => {
+      const definition = await loadAgent(getFirestore(), run.role);
+      if (!definition) {
+        return { outcome: 'failed', summary: `No active agent definition for role "${run.role}"` };
+      }
 
-        let cwd: string | undefined;
-        if (needsWorkspace(run.role)) {
-          try {
-            cwd = await prepareWorkspace({
-              owner: repoOwner.value(),
-              repo: repoName.value(),
-              branch: workBranch.value(),
-              token: githubToken.value(),
-              dir: '/tmp/workspace',
-            });
-          } catch (workspaceErr) {
-            await reportError(workspaceErr, { fn: 'prepareWorkspace', runId });
-            return {
-              outcome: 'failed',
-              summary: `Workspace setup failed: ${workspaceErr instanceof Error ? workspaceErr.message : String(workspaceErr)}`,
-            };
-          }
-        }
-
-        const useAngular = run.role === 'builder' || run.role === 'designer';
-
+      let cwd: string | undefined;
+      if (needsWorkspace(run.role)) {
         try {
-          const result = await runClaude({
-            prompt: taskPrompt(run),
-            systemPrompt: definition.instructions,
-            allowedTools: definition.tools,
-            model: definition.model,
-            maxTurns: definition.maxTurns,
-            cwd,
-            mcpServers: {
-              github: githubMcpServer(githubToken.value()),
-              firestore: firestoreMcpServer(accessToken),
-              ...(useAngular ? { angular: angularMcpServer() } : {}),
-            },
+          cwd = await prepareWorkspace({
+            owner: repoOwner.value(),
+            repo: repoName.value(),
+            branch: workBranch.value(),
+            token: githubToken.value(),
+            dir: '/tmp/workspace',
           });
-          return parseRunReport(result);
-        } catch (agentErr) {
-          await reportError(agentErr, { fn: 'runWorker', runId });
+        } catch (workspaceErr) {
+          await reportError(workspaceErr, { fn: 'prepareWorkspace', runId });
           return {
             outcome: 'failed',
-            summary: agentErr instanceof Error ? agentErr.message : String(agentErr),
+            summary: `Workspace setup failed: ${workspaceErr instanceof Error ? workspaceErr.message : String(workspaceErr)}`,
           };
         }
-      };
+      }
 
-      await executeRun(getFirestore(), runId, agent);
-      res.status(200).send('ok');
-    } catch (err) {
-      await reportError(err, { fn: 'runWorker' });
-      res.status(500).send('error');
-    }
+      const useAngular = run.role === 'builder' || run.role === 'designer';
+
+      try {
+        const result = await runClaude({
+          prompt: taskPrompt(run),
+          systemPrompt: definition.instructions,
+          allowedTools: definition.tools,
+          model: definition.model,
+          maxTurns: definition.maxTurns,
+          cwd,
+          mcpServers: {
+            github: githubMcpServer(githubToken.value()),
+            firestore: firestoreMcpServer(accessToken),
+            ...(useAngular ? { angular: angularMcpServer() } : {}),
+          },
+        });
+        return parseRunReport(result);
+      } catch (agentErr) {
+        await reportError(agentErr, { fn: 'runWorker', runId });
+        return {
+          outcome: 'failed',
+          summary: agentErr instanceof Error ? agentErr.message : String(agentErr),
+        };
+      }
+    };
+
+    await executeRun(getFirestore(), runId, agent);
   },
 );
 

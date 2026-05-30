@@ -36,8 +36,8 @@ firebase functions:secrets:set ANTHROPIC_API_KEY
 firebase functions:secrets:set GITHUB_TOKEN        # push access
 ```
 
-Copy `functions/.env.example` to `functions/.env` and fill it in (the script prints
-the exact values, plus your `REPO_OWNER`/`REPO_NAME`/`WORK_BRANCH`).
+Copy `functions/.env.example` to `functions/.env` and set `REPO_OWNER`, `REPO_NAME`,
+and `WORK_BRANCH`.
 
 ## 4. Deploy the backend
 
@@ -45,16 +45,9 @@ the exact values, plus your `REPO_OWNER`/`REPO_NAME`/`WORK_BRANCH`).
 firebase deploy --only firestore,functions
 ```
 
-Then restrict the worker to the invoker (the setup script printed these with your
-values):
-
-```bash
-gcloud run services add-iam-policy-binding runworker --region=REGION \
-  --member="serviceAccount:tasks-invoker@PROJECT.iam.gserviceaccount.com" \
-  --role="roles/run.invoker"
-gcloud run services remove-iam-policy-binding runworker --region=REGION \
-  --member="allUsers" --role="roles/run.invoker"
-```
+The worker is a task-queue function, so Firebase creates the Cloud Tasks queue and
+wires its invocation on deploy — no invoker service account, `run.invoker`, or worker
+URL to manage.
 
 ## 5. Deploy the cockpit (App Hosting)
 
