@@ -13,4 +13,5 @@ export const environment = {
   },
   // Set true to point the client at the local Firestore emulator (run `npm run emulators`).
   useEmulators: false,
+  admins: ['drew@youzag.com'],
 };

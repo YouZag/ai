@@ -13,4 +13,5 @@ export const environment = {
   },
   // When true, the client connects to the local Firestore emulator (see firebase.json).
   useEmulators: false,
+  admins: ['drew@youzag.com'],
 };

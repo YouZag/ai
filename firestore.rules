@@ -1,19 +1,51 @@
 rules_version = '2';
 
-// Default-deny Firestore security rules. Open up access per collection as your
-// data model grows. The Admin SDK (Express server + Cloud Functions) bypasses
-// these rules, so they only constrain direct client (browser) access.
-// Docs: https://firebase.google.com/docs/firestore/security/get-started
+// The cockpit (browser) reaches Firestore as an authenticated admin; the Admin SDK
+// (Cloud Functions + worker) bypasses these rules. Admins author direction
+// (vision, features, agents, directives) and read the pipeline; the pipeline
+// collections are written only by the server.
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Deny all client reads/writes by default.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['drew@youzag.com'];
+    }
+
+    match /vision/{doc} {
+      allow read, write: if isAdmin();
+    }
+    match /features/{doc} {
+      allow read, write: if isAdmin();
+    }
+    match /agents/{doc} {
+      allow read, write: if isAdmin();
+    }
+    match /directives/{doc} {
+      allow read, write: if isAdmin();
+    }
+
+    match /specs/{doc} {
+      allow read: if isAdmin();
+    }
+    match /steps/{doc} {
+      allow read: if isAdmin();
+    }
+    match /runs/{doc} {
+      allow read: if isAdmin();
+    }
+    match /architecture/{doc} {
+      allow read: if isAdmin();
+    }
+    match /activity/{doc} {
+      allow read: if isAdmin();
+    }
+    match /metrics/{doc} {
+      allow read: if isAdmin();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
-
-    // Example: let signed-in users read/write only their own user document.
-    // match /users/{userId} {
-    //   allow read, write: if request.auth != null && request.auth.uid == userId;
-    // }
   }
 }
