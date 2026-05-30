@@ -31,24 +31,28 @@ import { AuthService } from '../core/auth/auth.service';
       <button type="submit" [disabled]="!title().trim()">Add feature</button>
     </form>
 
-    <ul>
-      @for (feature of features(); track feature.id) {
-        <li>
-          <div class="row">
-            <strong>{{ feature.title }}</strong>
-            <span class="status">{{ feature.status }} · p{{ feature.priority }}</span>
-            @if (feature.status === 'proposed') {
-              <button type="button" (click)="plan(feature.id)">Mark planned</button>
+    @if (features.loading()) {
+      <p class="muted">Loading…</p>
+    } @else {
+      <ul>
+        @for (feature of features.data(); track feature.id) {
+          <li>
+            <div class="row">
+              <strong>{{ feature.title }}</strong>
+              <span class="status">{{ feature.status }} · p{{ feature.priority }}</span>
+              @if (feature.status === 'proposed') {
+                <button type="button" (click)="plan(feature.id)">Mark planned</button>
+              }
+            </div>
+            @if (feature.description) {
+              <p>{{ feature.description }}</p>
             }
-          </div>
-          @if (feature.description) {
-            <p>{{ feature.description }}</p>
-          }
-        </li>
-      } @empty {
-        <li>No features yet.</li>
-      }
-    </ul>
+          </li>
+        } @empty {
+          <li>No features yet.</li>
+        }
+      </ul>
+    }
   `,
   styles: `
     :host {
@@ -64,6 +68,9 @@ import { AuthService } from '../core/auth/auth.service';
     input {
       font: inherit;
       padding: 0.4rem;
+    }
+    .muted {
+      color: #777;
     }
     ul {
       list-style: none;
@@ -95,7 +102,7 @@ export class FeaturesComponent {
   private readonly featureService = inject(FeatureService);
   private readonly auth = inject(AuthService);
 
-  protected readonly features = this.featureService.all;
+  protected readonly features = this.featureService.features;
   protected readonly title = signal('');
   protected readonly description = signal('');
   protected readonly priority = signal(0);
