@@ -56,25 +56,19 @@ gcloud run services remove-iam-policy-binding runworker --region=REGION \
   --member="allUsers" --role="roles/run.invoker"
 ```
 
-## 5. Deploy the cockpit
+## 5. Deploy the cockpit (App Hosting)
 
-The cockpit is an Angular SSR app; deploy it with Firebase web frameworks:
+The cockpit is an Angular SSR app. Deploy it with Firebase **App Hosting**, which
+builds it on Cloud Build and serves the SSR app on Cloud Run:
 
 ```bash
-firebase experiments:enable webframeworks
+firebase apphosting:backends:create --project your-project
 ```
 
-Add a hosting block to `firebase.json`:
-
-```json
-"hosting": {
-  "source": ".",
-  "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-  "frameworksBackend": { "region": "us-central1" }
-}
-```
-
-Then `firebase deploy --only hosting`.
+Pick a region, connect this GitHub repo, and choose the branch to deploy from. App
+Hosting then builds and rolls out on pushes to that branch; `apphosting.yaml` (repo
+root) tunes the runtime. Use the working branch if you want the cockpit to redeploy
+as the system improves itself, or a separate stable branch for manual control.
 
 ## 6. Light it up
 
