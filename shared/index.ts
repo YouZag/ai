@@ -1,4 +1,5 @@
 export * from './agents.js';
+export * from './angular.js';
 export * from './claude.js';
 export * from './converter.js';
 export * from './dispatcher.js';
